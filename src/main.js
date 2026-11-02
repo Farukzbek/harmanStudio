@@ -151,6 +151,8 @@ function buildMenu() {
         sep,
         item('Şarkı Ekle…', 'add', 'CmdOrCtrl+O'),
         item('Mix\'i Kaydet…', 'export', 'CmdOrCtrl+E'),
+        item('Mix\'i Parçalara Bölerek Kaydet…', 'export-split', null),
+        item('Ses Parçalarını Ayrı Kaydet…', 'export-stems', null),
         sep,
         { role: 'close', label: 'Pencereyi Kapat' },
       ],
@@ -270,6 +272,44 @@ ipcMain.handle('save-mix', async (_e, { wav, defaultName, format: preferred = 'm
     fs.promises.rm(tmp, { force: true });
   }
   return filePath;
+});
+
+// Birden çok dosyayı bir klasöre yazar (bölünmüş mix, ayrı ses parçaları). Klasörü kullanıcı seçer.
+const safeName = (name) => String(name).replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Dosya';
+ipcMain.handle('save-batch', async (e, { files, format, kbps, title }) => {
+  // HARMAN_BATCH_DIR yalnızca test içindir (diyalogu atlar).
+  const { canceled, filePaths } = process.env.HARMAN_BATCH_DIR ? { canceled: false, filePaths: [process.env.HARMAN_BATCH_DIR] } : await dialog.showOpenDialog(winOf(e), {
+    title: title || 'Klasör seç',
+    defaultPath: app.getPath('music'),
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Buraya kaydet',
+  });
+  if (canceled || !filePaths[0]) return null;
+  const dir = filePaths[0];
+  const used = new Set();
+  for (const f of files) {
+    let base = safeName(f.name);
+    for (let n = 2; used.has(base.toLowerCase()); n++) base = `${safeName(f.name)} (${n})`;
+    used.add(base.toLowerCase());
+    const data = Buffer.from(f.wav);
+    if (format === 'wav') {
+      await fs.promises.writeFile(path.join(dir, `${base}.wav`), data);
+    } else {
+      const tmp = tempFile('wav');
+      try {
+        await fs.promises.writeFile(tmp, data);
+        await runFfmpeg(['-i', tmp, '-codec:a', 'libmp3lame', '-b:a', `${kbps || 320}k`, path.join(dir, `${base}.mp3`)]);
+      } finally {
+        fs.promises.rm(tmp, { force: true });
+      }
+    }
+  }
+  return { dir, count: files.length };
+});
+ipcMain.handle('choose-format', async (e, { message, detail }) => {
+  if (process.env.HARMAN_TEST_FORMAT) return process.env.HARMAN_TEST_FORMAT;   // yalnızca test içindir
+  const { response } = await dialog.showMessageBox(winOf(e), { type: 'question', message, detail, buttons: ['MP3', 'WAV', 'Vazgeç'], defaultId: 0, cancelId: 2 });
+  return ['mp3', 'wav', null][response];
 });
 
 // Vokal / enstrüman ayırma. İlerleme olayları isteği yapan pencereye gider.

@@ -1911,7 +1911,7 @@ function bassSwapPoints(clip) {
 // Zincir (her klip): kaynak → seviye (parça seviyesi + zamanlı geçişler) → parça dengesi
 //   → zarf (fade) → klip dengesi → hat (çalma kutucuğu) → çıkış.
 // keepSilent: kapalı parçaları ve hatları da kur, çalarken yeniden başlatmadan açılabilsin.
-function scheduleMix(audioCtx, from, base, destination, { keepSilent = false } = {}) {
+function scheduleMix(audioCtx, from, base, destination, { keepSilent = false, stemOnly = null } = {}) {
   const sources = [];
   const parts = [];
   const clipNodes = [];
@@ -1961,6 +1961,8 @@ function scheduleMix(audioCtx, from, base, destination, { keepSilent = false } =
     const list = hasStems(clip)
       ? stemNames(clip).map((name) => ({ name, buffer: sourceOf(clip).stems[name].buffer, gain: stemGain(clip, name) }))
       : [{ name: null, buffer: clip.buffer, gain: 1 }];
+    // stemOnly: yalnızca bu ses parçası (vokal, davul…) çalınır; ses parçası olmayan klipler sessiz kalır.
+    if (stemOnly && !list.some((p) => p.name === stemOnly)) continue;
     // Eğri noktalarını WebAudio parametresine zamanlar: bu noktaların arası doğrusaldır.
     const scheduleCurve = (param, pts, fallback) => {
       param.setValueAtTime(curveAt(pts, srcTime(startTl), fallback), when);
@@ -1971,6 +1973,7 @@ function scheduleMix(audioCtx, from, base, destination, { keepSilent = false } =
     };
 
     for (const part of list) {
+      if (stemOnly && part.name !== stemOnly) continue;
       const levelRamped = part.name && hasLevelRamps(clip, part.name);
       if (part.gain <= 0 && !levelRamped && !keepSilent) continue;
       const src = audioCtx.createBufferSource();
@@ -2124,33 +2127,38 @@ function encodeWav(buffer) {
 // Çıktı biçimi (MP3 ya da WAV) kaydetme penceresinde seçilir; son seçilen bir sonraki sefer varsayılan olur.
 const lastFormat = () => { try { return localStorage.getItem('harman.lastFormat') === 'wav' ? 'wav' : 'mp3'; } catch { return 'mp3'; } };
 
+// Mix'i çevrimdışı çizer. normalize: en yüksek tepeyi −1 dB'e getirir. stemOnly: yalnızca bir ses parçası.
+async function renderMix({ normalize = state.normalize, stemOnly = null } = {}) {
+  const total = projectEnd();
+  const offline = new OfflineAudioContext(2, Math.ceil(total * SAMPLE_RATE), SAMPLE_RATE);
+  scheduleMix(offline, 0, 0, offline.destination, { stemOnly });
+  const rendered = await offline.startRendering();
+  if (normalize) {
+    let peak = 0;
+    for (let ch = 0; ch < rendered.numberOfChannels; ch++) {
+      for (const v of rendered.getChannelData(ch)) if (Math.abs(v) > peak) peak = Math.abs(v);
+    }
+    if (peak > 0) {
+      const scale = 0.891 / peak;        // -1 dBFS
+      for (let ch = 0; ch < rendered.numberOfChannels; ch++) {
+        const data = rendered.getChannelData(ch);
+        for (let i = 0; i < data.length; i++) data[i] *= scale;
+      }
+    }
+  }
+  return rendered;
+}
+
+const mixBaseName = () => project.name || (state.clips[0] ? `${state.clips[0].name} mix` : 'Mix');
+
 async function exportMix() {
   if (!state.clips.length) return toast('Önce bir şarkı ekle');
   pause();
   el.btnExport.disabled = true;
   try {
     toast('Mix hazırlanıyor...');
-    const total = projectEnd();
-    const offline = new OfflineAudioContext(2, Math.ceil(total * SAMPLE_RATE), SAMPLE_RATE);
-    scheduleMix(offline, 0, 0, offline.destination);
-    const rendered = await offline.startRendering();
-
-    if (state.normalize) {
-      let peak = 0;
-      for (let ch = 0; ch < rendered.numberOfChannels; ch++) {
-        for (const v of rendered.getChannelData(ch)) if (Math.abs(v) > peak) peak = Math.abs(v);
-      }
-      if (peak > 0) {
-        const scale = 0.891 / peak;        // -1 dBFS
-        for (let ch = 0; ch < rendered.numberOfChannels; ch++) {
-          const data = rendered.getChannelData(ch);
-          for (let i = 0; i < data.length; i++) data[i] *= scale;
-        }
-      }
-    }
-
-    const name = `${state.clips[0].name} mix`;
-    const saved = await window.harman.saveMix(encodeWav(rendered), name, lastFormat(), 320);
+    const rendered = await renderMix();
+    const saved = await window.harman.saveMix(encodeWav(rendered), `${state.clips[0].name} mix`, lastFormat(), 320);
     if (saved) {
       try { localStorage.setItem('harman.lastFormat', /\.wav$/i.test(saved) ? 'wav' : 'mp3'); } catch { /* özel pencere */ }
       toast(`Kaydedildi: ${saved}`);
@@ -2160,6 +2168,84 @@ async function exportMix() {
   } finally {
     el.btnExport.disabled = false;
   }
+}
+
+// AudioBuffer'dan [t0, t1) aralığını keser; uçlara tık sesini önleyen 5 ms'lik fade koyar.
+function sliceBuffer(buffer, t0, t1) {
+  const i0 = Math.max(0, Math.floor(t0 * buffer.sampleRate));
+  const i1 = Math.min(buffer.length, Math.ceil(t1 * buffer.sampleRate));
+  const out = ctx.createBuffer(buffer.numberOfChannels, Math.max(1, i1 - i0), buffer.sampleRate);
+  const ramp = Math.min(Math.floor(0.005 * buffer.sampleRate), Math.floor((i1 - i0) / 2));
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const data = out.getChannelData(ch);
+    data.set(buffer.getChannelData(ch).subarray(i0, i1));
+    for (let k = 0; k < ramp; k++) { data[k] *= k / ramp; data[data.length - 1 - k] *= k / ramp; }
+  }
+  return out;
+}
+
+// Mix'in bölüneceği yerler: işaretçiler varsa onlar, yoksa ardışık parçaların geçiş ortaları.
+function splitPlan() {
+  const end = projectEnd();
+  const marks = [...state.markers].filter((m) => m.t > 0.05 && m.t < end - 0.05).sort((a, b) => a.t - b.t);
+  if (marks.length) {
+    const starts = [{ t: 0, name: 'Başlangıç' }, ...marks.map((m) => ({ t: m.t, name: m.name }))];
+    return starts.map((s, i) => ({ name: s.name, t0: s.t, t1: i + 1 < starts.length ? starts[i + 1].t : end }));
+  }
+  const sorted = [...state.clips].sort((a, b) => a.start - b.start);
+  if (sorted.length < 2) return [];
+  const cuts = [];
+  for (let i = 0; i + 1 < sorted.length; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    cuts.push(b.start < clipEnd(a) ? (b.start + clipEnd(a)) / 2 : clipEnd(a));      // geçişin ortası
+  }
+  return sorted.map((c, i) => ({ name: c.name, t0: i === 0 ? 0 : cuts[i - 1], t1: i + 1 < sorted.length ? cuts[i] : end }));
+}
+
+async function exportSplit() {
+  if (!state.clips.length) return toast('Önce bir şarkı ekle');
+  const plan = splitPlan();
+  if (plan.length < 2) return toast('Bölmek için en az iki parça ya da bir işaretçi (M) gerekir');
+  const format = await window.harman.chooseFormat(
+    `Mix ${plan.length} dosyaya bölünecek`,
+    `${plan.map((p, i) => `${i + 1}. ${p.name}`).join('\n').slice(0, 500)}\n\nKesim yerleri: ${state.markers.length ? 'işaretçiler' : 'parçalar arasındaki geçişlerin ortası'}. Hangi biçimde kaydedilsin?`,
+  );
+  if (!format) return;
+  pause();
+  const ok = await runBusy('Mix bölünüyor', async () => {
+    setSepProgress({ text: 'Mix hazırlanıyor' });
+    const rendered = await renderMix();
+    const width = String(plan.length).length;
+    const files = plan.map((p, i) => ({ name: `${String(i + 1).padStart(Math.max(2, width), '0')} - ${p.name}`, wav: encodeWav(sliceBuffer(rendered, p.t0, p.t1)) }));
+    setSepProgress({ text: format === 'mp3' ? 'Dosyalar MP3\'e çevriliyor' : 'Dosyalar yazılıyor' });
+    const done = await window.harman.saveBatch(files, format, 320, 'Bölünmüş mix için klasör seç');
+    state.lastBatch = done;
+  });
+  if (ok && state.lastBatch) { toast(`${state.lastBatch.count} dosya kaydedildi: ${state.lastBatch.dir}`); state.lastBatch = null; }
+}
+
+// Her ses parçasını (vokal, davul, bas, diğer) mix'in kendi ayarlarıyla ayrı bir dosya olarak kaydeder.
+async function exportStems() {
+  const names = STEM_ORDER.filter((n) => state.clips.some((c) => hasStems(c) && n in sourceOf(c).stems));
+  if (!names.length) return toast('Önce bir parçada vokal / enstrüman ayırma yap');
+  const format = await window.harman.chooseFormat(
+    `${names.length} ses parçası ayrı dosyalara kaydedilecek`,
+    `${names.map((n) => STEM_LABELS[n] || n).join(', ')}\n\nHer dosya mix'in tamamını (kesimler, geçişler, seviyeler dahil) yalnızca o ses parçasıyla içerir. Hangi biçimde kaydedilsin?`,
+  );
+  if (!format) return;
+  pause();
+  const ok = await runBusy('Ses parçaları kaydediliyor', async () => {
+    const files = [];
+    for (let i = 0; i < names.length; i++) {
+      setSepProgress({ text: `${STEM_LABELS[names[i]] || names[i]} hazırlanıyor`, detail: `${i + 1} / ${names.length}`, pct: (i / names.length) * 100 });
+      const rendered = await renderMix({ normalize: false, stemOnly: names[i] });
+      files.push({ name: `${mixBaseName()} - ${STEM_LABELS[names[i]] || names[i]}`, wav: encodeWav(rendered) });
+    }
+    setSepProgress({ text: 'Dosyalar yazılıyor' });
+    state.lastBatch = await window.harman.saveBatch(files, format, 320, 'Ses parçaları için klasör seç');
+  });
+  if (ok && state.lastBatch) { toast(`${state.lastBatch.count} dosya kaydedildi: ${state.lastBatch.dir}`); state.lastBatch = null; }
 }
 
 // ------------------------------------------------------------ ayırma penceresi
@@ -3762,6 +3848,8 @@ async function offerRestore() {
 const actions = {
   add: pickAndAdd,
   export: exportMix,
+  'export-split': exportSplit,
+  'export-stems': exportStems,
   'project-save': () => saveProject(),
   'project-save-as': () => saveProject(true),
   'project-open': projectOpen,
@@ -3806,6 +3894,7 @@ $('zoom-in').addEventListener('click', () => actions['zoom-in']());
 $('zoom-out').addEventListener('click', () => actions['zoom-out']());
 $('zoom-fit').addEventListener('click', fitAll);
 $('btn-help').addEventListener('click', () => toggleHelp(true));
+$('stems-export').addEventListener('click', exportStems);
 $('help-close').addEventListener('click', () => toggleHelp(false));
 el.help.addEventListener('pointerdown', (e) => { if (e.target === el.help) toggleHelp(false); });
 
