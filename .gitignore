@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# Derleme sırasında üretilen ikon dosyaları (scripts/make-icon.js ile yeniden üretilir)
+build/

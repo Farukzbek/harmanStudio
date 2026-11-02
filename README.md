@@ -1,0 +1,164 @@
+# Harman
+
+Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (macOS). Şarkıları yükle, istediğin yerlerinden kes, vokali ve enstrümanları ayır, iki şarkının tempo ve tonunu eşleştir, fade ve crossfade ile birleştir, MP3 veya WAV olarak kaydet. Müzik prodüksiyonu bilmen gerekmez.
+
+> Durum: v0.1, erken sürüm. Şu an yalnızca macOS (Apple Silicon) hedeflenir.
+
+## Özellikler
+
+**Düzenleme**
+- MP3, WAV, FLAC, M4A, OGG ve daha fazlasını ekle (butonla veya sürükle-bırak)
+- 4 hatlı zaman çizelgesi: parçaları sürükle, kenarlarından kes, oynatma çizgisinden böl, çoğalt
+- Fade in / fade out ve eşit güçlü crossfade (iki parça üst üste binince geçişte ses çukuru oluşmaz); kesim noktalarında tık sesini önleyen otomatik mikro fade
+- Geri al / yinele, kopyala / kes / yapıştır, sağ tık menüleri
+- Fareyle dikdörtgen çizerek toplu seçim; seçili parçaları birlikte taşı, böl, çoğalt, sil. Sürüklerken görünümün kenarına gelince otomatik kayar
+- Her hattın sağ altında bir kutucuk: kapatırsan o hattaki parçalar çalmaz (kaydedilen mix'e de girmez)
+- Her parça bağımsızdır: bir şarkıdan kesilen, çoğaltılan veya yapıştırılan parçaların BPM/ton düzeltmesi, vokal ayırma sonucu, tempo/ton değişikliği, zamanlı geçişleri ve sıfırlaması kendilerine aittir. Ses verisi paylaşıldığı için bellek harcanmaz; aynı sesten ayrılmış parçalar varsa yeniden hesaplanmadan kullanılır
+- Çalarken yakınlaştır (⌥ + kaydır, trackpad'de sıkıştır), sağa sola git, istediğin saniyeye tıkla veya süre yaz; Boşluk son tıklanan yerden oynatır
+
+**Ses ve karışım**
+- Parça başına ses seviyesi (dB) ve sol / sağ denge
+- Vokal / enstrüman ayırma: vokal, davul, bas, diğer. Her ses parçasının seviyesi ve sol/sağ dengesi ayrı; "Sadece vokal" / "Vokalsiz" ön ayarları
+- Zamanlı geçişler (her ses parçası için ayrı): şarkının istediğin saniyeleri arasında seviyeyi bir yüzdeden başka bir yüzdeye (artan veya azalan) ve istersen yönü (sol/sağ) kademeli olarak götür. Ör. davul 54. saniyeden 75. saniyeye %12'den %86'ya yükselsin, sol kulaktan sağ kulağa geçsin
+- Sürgülerin yanındaki değere (ör. "Sağ 3", "%80") tıklamak varsayılana döndürür
+
+**Tempo ve ton**
+- Otomatik BPM, ton (Camelot koduyla) ve ilk vuruş analizi; klip başlığında "124 BPM · 8A" etiketi
+- Bir parçayı diğerinin tempoyuna ve tonuna getir (Rubber Band ile), vuruşları hizala
+
+**Çıktı**
+- MP3 (320 kbps) veya WAV; biçim kaydetme penceresindeki dosya türünden seçilir
+- İsteğe bağlı normalize: mix'in en yüksek ses tepesini −1 dB'e ayarlar
+
+## Gereksinimler
+
+- macOS, Apple Silicon (M1 ve sonrası). Vokal ayırma için gereklidir.
+- [Node.js](https://nodejs.org) 18 veya üstü
+- `ffmpeg`: MP3 kaydetmek ve Chromium'un açamadığı formatlar için. `brew install ffmpeg`
+- Vokal ayırma ve tempo/ton için `uv` önerilir: `brew install uv` (yoksa Python 3.10 veya üstü aranır)
+
+## Çalıştırma
+
+```bash
+npm install
+npm start
+```
+
+### Masaüstü uygulaması olarak derleme
+
+```bash
+npm run package
+```
+
+`dist/` altına `Harman.app` üretir ve masaüstüne kısayol koyar. İkon betiği (`scripts/make-icon.js`) ilk derlemede çalışır.
+
+## Vokal / enstrüman ayırma
+
+Ayırma tamamen bilgisayarında çalışır, dosyaların dışarı gönderilmez.
+
+- Parçayı seç, yan panelde **Vokal / enstrüman ayır…** (⇧⌘S).
+- İlk kullanımda motor otomatik kurulur (yaklaşık 1 GB) ve seçilen model indirilir. Motor `~/Library/Application Support/Harman/engine` altında durur; uygulamayı yeniden derlemek bunu silmez.
+- Modeller [mlx-audio-separator](https://pypi.org/project/mlx-audio-separator/) üzerinden gelir:
+
+| Seçenek | Model | Çıktı | Hız* | İlk indirme | Tepe bellek |
+|---|---|---|---|---|---|
+| Hızlı | Demucs `htdemucs` | vokal, davul, bas, diğer | ≈ 10 kat | ≈ 85 MB | ≈ 2 GB |
+| Kaliteli | Demucs `htdemucs_ft` | vokal, davul, bas, diğer | ≈ 3 kat | ≈ 330 MB | ≈ 3,3 GB |
+| En temiz vokal | BS-RoFormer | vokal, enstrüman | ≈ 0,8 kat | ≈ 640 MB | ≈ 2,1 GB |
+
+\* M2'de 4 dakikalık bir şarkıyla ölçüldü, gerçek zamana göre kat (yük altında düşebilir). Kaliteli ve En temiz vokal ilk kullanımda bu bilgisayar için dönüştürülür (birkaç dakika, tek seferlik).
+
+**Bellek:** Ayırma sırasında MLX'in belleği toplam RAM'in yaklaşık %18'iyle sınırlanır ve işlem düşük öncelikle çalışır (`tools/separate.py`). Sınırsız bırakılınca 4 dakikalık bir şarkı 4-5 GB alıp 8 GB'lık bir Mac'i donduruyordu. Sınırla çıktı kalitesi değişmez. 8 GB'lık makinede Kaliteli model yine de ağırdır; günlük kullanım için Hızlı önerilir.
+
+## Zamanlı geçişler
+
+Ayrılmış bir ses parçasının (ör. Davul) altındaki **Zamanlı geçişler** panelinde:
+
+1. Üstteki **+** / **−** düğmeleri seviyenin kademeli artmasını veya azalmasını seçer.
+2. Başlangıç ve bitiş saniyesini, seviye başı ve sonu yüzdesini yaz. İstersen "Yönü de değiştir"i işaretleyip sol/sağ başı ve sonu (−100 tam sol, +100 tam sağ) gir. Seviye kutularını boş bırakırsan yalnızca yön değişir.
+3. **Geçiş ekle**. Geçişten önce başlangıç, sonra hedef değerinde kalır. Geçişi olan değerin kaydırıcısı kilitlenir ("Zamanlı"); geçişleri listeden silebilirsin.
+
+Saniyeler **parçanın sol kenarından** itibaren sayılır (kırpılmış, bölünmüş veya taşınmış parçada da ekranda gördüğün gibi). Arka planda şarkı saniyesine çevrildiği için parçayı taşırsan geçiş sesin aynı yerinde kalır. Çalan kısmın dışında kalan bir geçiş listede "parça dışında" diye işaretlenir.
+
+## Tempo ve ton eşleştirme
+
+1. İki şarkı ekle. Her birinin BPM ve tonu otomatik analiz edilir (birkaç saniye).
+2. İkinci parçayı seç, yan panelde **Tempo ve ton → Başka bir parçaya eşleştir**. Referans parçayı seç (varsayılan: üst üste bindiği parça).
+3. **Uygula**: parça referansın tempoyuna yavaşlatılır/hızlandırılır, istersen tonu da kaydırılır. **Vuruşları hizala**: parçayı en fazla yarım vuruş kaydırıp vuruşları referansla aynı ızgaraya oturtur.
+
+Bilmen gerekenler:
+
+- Tempo hep **orijinalden** işlenir; tekrar uygulamak sesi katman katman bozmaz. **Orijinal tempo ve tona dön** ile geri alınır, ⌘Z de çalışır.
+- Tempo değişimi %10'dan, ton kaydırması 3 yarım tondan büyükse ses bozulmaya başlar; uygulama uyarır.
+- Tempo tek bir oktavda ([80, 160) BPM) aranır: 170 BPM'lik bir parça 85, 70 BPM'lik bir parça 140 görünebilir. Eşleştirme her zaman en yakın oktavı seçtiği için sorun olmaz, yanlışsa **½ / 2×** ile düzeltirsin.
+- Ton tespiti tahminidir (özellikle majör ↔ bağıl minör karışabilir). Camelot kodundaki sayı aynıysa iki ton uyumludur. Yanlışsa tonu elle değiştir.
+- Analiz ve eşleştirme sentetik şarkılarla doğrulandı (çeşitli davul kalıplarında tempo ±0,6 BPM, vuruş konumu ±20 ms). Gerçek müzikte doğruluk daha düşük olabilir.
+- İlk kullanımda küçük bir araç (≈ 30 MB) otomatik kurulur: `~/Library/Application Support/Harman/tools`.
+
+## Kısayollar
+
+Uygulama içinde `⌘/` ile tam liste açılır.
+
+| Tuş | İşlem |
+|---|---|
+| Boşluk | Son tıklanan yerden oynat / durdur |
+| ⇧ Boşluk | Durduğu yerden devam et |
+| Return / Home / End | Başa dön / sona git |
+| ← → | 1 sn geri / ileri (⇧ ile 5 sn) |
+| S | Seçili parçayı oynatma çizgisinden böl |
+| Q / W | Parçanın başını / sonunu oynatma çizgisine kırp |
+| ⌘D | Parçayı çoğalt |
+| ⌘A | Tüm parçaları seç |
+| ⌘C / ⌘X / ⌘V | Kopyala / kes / yapıştır (oynatma çizgisine) |
+| Sağ tık | Parça veya boş alan menüsü |
+| Boş alanda sürükle | Dikdörtgenle toplu seçim (⇧ ile seçime ekle) |
+| ⇧ + tıkla | Parçayı seçime ekle / çıkar |
+| ⇧⌘S | Vokal / enstrüman ayır |
+| ⇧⌘M | Tempo ve tonu eşleştir |
+| ⌫ | Parçayı sil |
+| ⌘Z / ⇧⌘Z | Geri al / yinele |
+| ⌘O / ⌘E | Şarkı ekle / mix'i kaydet |
+| ⌥ + kaydır | Parmaklar yukarı yakınlaştırır, aşağı uzaklaştırır (imlecin olduğu yerde) |
+| Trackpad'de sıkıştır | Yakınlaştır / uzaklaştır |
+| ⌃ + kaydır, ⇧ + kaydır | Sağa sola git |
+| ⌘0 | Tümünü sığdır |
+| Boş alana / cetvele / klibe tıkla | Oynatma çizgisini oraya taşır (çalarken de) |
+| Süre sayacına tıkla | Süre yazarak git (1:23 veya 83) |
+| ⌘ basılıyken sürükle | Yapışmayı kapat |
+| Sürgüye çift tıkla veya değerine tıkla | Varsayılan değere dön |
+
+## Proje yapısı
+
+```
+src/main.js            Electron ana süreç: pencere, menü, dosya ve kaydetme penceresi, ses işlemleri
+src/preload.js         Arayüz ile ana süreç arasındaki güvenli köprü
+src/engine.js          Vokal / enstrüman ayırma motoru (Python yan servisi) yönetimi
+src/tempo.js           Tempo / ton aracı (Rubber Band) yönetimi
+src/pyenv.js           Python ortamı kurma ve süreç çalıştırma yardımcıları
+src/saveformat.js      Kaydetme yolundan biçim çıkarma
+src/renderer/          Arayüz: index.html, style.css, app.js (zaman çizelgesi, ses motoru), analysis.js (BPM / ton)
+tools/separate.py      Ayırma motorunu bellek sınırıyla başlatır
+tools/stretch.py       Tempo / ton değiştirme (pedalboard / Rubber Band)
+scripts/               Derleme ve ikon betikleri
+```
+
+Ses, Web Audio ile arayüzde çalınır ve kaydedilir; ağır işler (ayırma, tempo/ton) kullanıcı klasöründeki ayrı Python ortamlarında çalışır.
+
+## Bilinen sınırlar
+
+- Yalnızca macOS / Apple Silicon denendi. Vokal ayırma MLX gerektirdiği için Intel Mac ve diğer sistemlerde çalışmaz.
+- Tempo ve ton tespiti gerçek müzikle geniş ölçekte denenmedi; ton tespiti özellikle tahminidir.
+- Zamanlı geçişler form ile girilir; parçanın üstünde fareyle çekilen bir eğri yok.
+- Toplu seçimde yan panel birincil parçayı gösterir; seviye ve fade gibi ayarlar şimdilik yalnızca o parçaya uygulanır.
+
+## Yol haritası
+
+1. Akıllı geçiş önerileri (en iyi geçiş noktası ve ton uyumu)
+
+## Lisans ve üçüncü parti notları
+
+Harman'ın kendi kodu [MIT](LICENSE) lisanslıdır. Aşağıdakiler depoya ve uygulamaya konmaz; kullanıcı kendi bilgisayarına kurar veya indirir:
+
+- **Ayırma modelleri:** BS-RoFormer ağırlıkları ticari olmayan kullanıma açıktır (CC-BY-NC-SA); Demucs ağırlıklarının lisansı belirsizdir. Kod tarafında `mlx-audio-separator` ve `demucs` MIT lisanslıdır.
+- **Tempo / ton:** [pedalboard](https://github.com/spotify/pedalboard) içindeki Rubber Band ile yapılır; ikisi de GPL lisanslıdır. Harman bunları ayrı bir süreç olarak çalıştırır.
+- **FFmpeg:** MP3 kodlama ve biçim dönüştürme için kullanıcının kendi kurulumu kullanılır.
