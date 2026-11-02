@@ -45,6 +45,7 @@ const state = {
   redo: [],
   pending: null,                // süren bir düzenlemenin başlangıç görüntüsü
   normalize: true,
+  loop: null,                   // { from, to } saniye: çalarken bu aralık tekrarlanır
 };
 const keys = { ctrl: false };   // gerçek Ctrl tuşu (trackpad sıkıştırmasından ayırt etmek için)
 
@@ -74,7 +75,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), insMulti: $('ins-multi'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -542,6 +543,18 @@ function drawRuler() {
     }
   }
 
+  // Döngü aralığı
+  if (state.loop) {
+    const lx0 = Math.max(GUTTER, GUTTER + state.loop.from * state.pps - view.scrollLeft);
+    const lx1 = Math.min(w, GUTTER + state.loop.to * state.pps - view.scrollLeft);
+    if (lx1 > lx0) {
+      g.fillStyle = 'rgba(255,122,69,0.28)';
+      g.fillRect(lx0, RULER_H - 6, lx1 - lx0, 6);
+      g.fillStyle = 'rgba(255,122,69,0.10)';
+      g.fillRect(lx0, 0, lx1 - lx0, RULER_H - 6);
+    }
+  }
+
   // Başlangıç işareti: Boşluk'la çalmaya başlanacak yer (içi boş üçgen).
   const mx = Math.round(GUTTER + state.marker * state.pps - view.scrollLeft) + 0.5;
   if (mx >= GUTTER && mx <= w) {
@@ -571,11 +584,22 @@ function updateTrackWidth() {
 function layoutAll(skipDraw = false) {
   updateTrackWidth();
   state.clips.forEach(positionClip);
+  updateLoopUI();
   el.empty.hidden = state.clips.length > 0;
   el.total.textContent = `/ ${formatTime(projectEnd(), 2)}`;
   updatePlayheadUI();
   updateInspector();
   if (!skipDraw) redrawVisible();
+}
+
+function updateLoopUI() {
+  const band = el.loopBand;
+  band.hidden = !state.loop;
+  if (state.loop) {
+    band.style.left = `${GUTTER + state.loop.from * state.pps}px`;
+    band.style.width = `${(state.loop.to - state.loop.from) * state.pps}px`;
+  }
+  drawRuler();
 }
 
 function updatePlayheadUI() {
@@ -1587,6 +1611,23 @@ function pause() {
 
 let scrubbing = false;   // oynatma çizgisi fareyle sürükleniyor
 
+// Döngü: çalarken aralığın sonuna gelince başa sarar. Yalnızca dinlemek içindir, mix'e etkisi yoktur.
+function setLoop(from, to) {
+  state.loop = to - from > 0.2 ? { from: Math.max(0, from), to } : null;
+  updateLoopUI();
+}
+
+function toggleLoop() {
+  if (state.loop) { setLoop(0, 0); toast('Döngü kapatıldı'); return; }
+  const clips = selectedClips();
+  if (!clips.length) return toast('Döngüde dinlemek için önce bir parça seç');
+  setLoop(Math.min(...clips.map((c) => c.start)), Math.max(...clips.map(clipEnd)));
+  state.marker = state.loop.from;
+  seek(state.loop.from);
+  play();
+  toast('Seçili parça döngüde çalıyor. Kapatmak için L');
+}
+
 // Boşluk: çalıyorsa durdurur; durmuşsa son tıklanan yerden (işaret) başlatır. Durdurunca çizgi
 // durduğu yerde kalır. ⇧Boşluk: durduğu yerden devam eder.
 function togglePlay() {
@@ -1625,6 +1666,10 @@ function tick() {
   if (!p) return;
   if (scrubbing) { requestAnimationFrame(tick); return; }
   state.playhead = p.startPlayhead + Math.max(0, ctx.currentTime - p.base);
+  if (state.loop && state.playhead >= state.loop.to) {
+    seek(state.loop.from);
+    return;
+  }
   if (state.playhead >= projectEnd()) {
     pause();
     state.playhead = projectEnd();
@@ -2584,7 +2629,7 @@ function renderTransitions(list, a, b) {
     apply.addEventListener('click', () => applyTransition(s, a.id, b.id, false));
     const listen = document.createElement('button');
     listen.className = 'btn solid mini';
-    listen.textContent = 'Uygula ve dinle';
+    listen.textContent = 'Uygula ve döngüde dinle';
     listen.addEventListener('click', () => applyTransition(s, a.id, b.id, true));
     actions.append(apply, listen);
     card.append(head, body, actions);
@@ -2653,7 +2698,15 @@ async function applyTransition(s, aId, bId, listen) {
   syncSelectionUI();
   goTo(Math.max(0, tlA - 6));
   toast(`Geçiş uygulandı (${formatTime(tlA, 0)}). ⌘Z ile tek adımda geri alabilirsin`);
-  if (listen) play();
+  if (listen) {
+    // Geçiş bölgesi (öncesinde ve sonrasında 5 sn) döngüde çalar; kapatmak için L.
+    const b = state.clips.find((c) => c.id === bId);
+    setLoop(Math.max(0, b.start - 5), b.start + b.fadeIn + 5);
+    state.marker = state.loop?.from ?? state.marker;
+    seek(state.marker);
+    play();
+    toast('Geçiş döngüde çalıyor. Kapatmak için L');
+  }
 }
 
 el.transFind.addEventListener('click', findTransitions);
@@ -2900,6 +2953,7 @@ async function loadProject(data, dir, { path = null, name = null, dirty = false 
   tempo.refId = null;
   tempo.forClip = null;
   state.nextId = 1;
+  state.loop = null;
 
   const idMap = new Map();
   for (const s of data.sources) idMap.set(s.id, state.nextId++);
@@ -3017,6 +3071,7 @@ async function projectNew() {
   tempo.forClip = null;
   state.playhead = 0;
   state.marker = 0;
+  state.loop = null;
   project.path = null;
   project.name = null;
   project.written = new Map();
@@ -3077,6 +3132,7 @@ const actions = {
   match: showMatchPanel,
   delete: deleteSelected,
   play: togglePlay,
+  loop: toggleLoop,
   start: () => { goTo(0); el.timeline.scrollLeft = 0; },
   end: () => goTo(projectEnd()),
   'zoom-in': () => zoomBy(1.4),
@@ -3333,6 +3389,7 @@ document.addEventListener('keydown', (e) => {
   switch (e.code) {
     case 'Space': e.preventDefault(); document.activeElement?.blur(); (e.shiftKey ? resumePlay() : togglePlay()); break;
     case 'KeyS': splitSelected(); break;
+    case 'KeyL': toggleLoop(); break;
     case 'KeyQ': case 'BracketLeft': trimToPlayhead('start'); break;
     case 'KeyW': case 'BracketRight': trimToPlayhead('end'); break;
     case 'Delete': case 'Backspace': deleteSelected(); break;

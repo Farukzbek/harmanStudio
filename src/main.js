@@ -118,6 +118,7 @@ function buildMenu() {
       label: 'Oynatma',
       submenu: [
         item('Oynat / Duraklat', 'play', 'Space', display),
+        item('Seçili Parçayı Döngüde Dinle', 'loop', 'L', display),
         item('Başa Dön', 'start', 'Return', display),
         item('Sona Git', 'end', 'End', display),
       ],
