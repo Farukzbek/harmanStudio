@@ -137,6 +137,20 @@
             <output id="ins-pan-val"></output>
             <input id="ins-pan" class="bipolar" type="range" min="-100" max="100" value="0" data-default="0">
           </div>
+          <div class="field">
+            <label for="ins-bass">Bas</label>
+            <output id="ins-bass-val"></output>
+            <input id="ins-bass" class="bipolar" type="range" min="-12" max="12" value="0" data-default="0">
+          </div>
+          <div class="field">
+            <label for="ins-treble">Tiz</label>
+            <output id="ins-treble-val"></output>
+            <input id="ins-treble" class="bipolar" type="range" min="-12" max="12" value="0" data-default="0">
+          </div>
+          <div class="match-line">
+            <button id="ins-swap" class="switch" role="switch" aria-checked="false" aria-label="Geçişte bas takası"><i></i></button>
+            <span title="Parçanın fade bölgelerinde basını geçişin ortasında kısar / açar; iki parçanın basları üst üste binip çamurlaşmaz">Geçişte bas takası</span>
+          </div>
           <p id="ins-multi" class="hint" hidden></p>
           <button id="ins-level" class="btn solid wide" hidden title="Seçili parçaların ses yüksekliğini birbirine yaklaştırır">Seçilenlerin seviyesini eşitle</button>
         </section>
@@ -187,6 +201,10 @@
               <button id="match-reset" class="btn solid wide" hidden>Orijinal tempo ve tona dön</button>
 
               <div class="trans">
+                <div class="match-line">
+                  <button id="trans-bass" class="switch" role="switch" aria-checked="true" aria-label="Bas takası"><i></i></button>
+                  <span title="Geçişin ortasında çıkan parçanın basını kısar, giren parçanın basını açar">Bas takası (DJ geçişi)</span>
+                </div>
                 <div class="seg-row">
                   <span>Geçiş</span>
                   <span id="trans-beats" class="seg" role="group" aria-label="Geçiş uzunluğu (vuruş)">
