@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" alt="Harman logosu" width="128"></p>
+
 # Harman
 
 Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (macOS). Şarkıları yükle, istediğin yerlerinden kes, vokali ve enstrümanları ayır, iki şarkının tempo ve tonunu eşleştir, fade ve crossfade ile birleştir, MP3 veya WAV olarak kaydet. Müzik prodüksiyonu bilmen gerekmez.

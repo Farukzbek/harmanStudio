@@ -29,7 +29,7 @@ fi
 ./node_modules/.bin/electron-packager . Harman \
   --platform=darwin --arch=arm64 --out="$OUT" --overwrite \
   --icon=build/icon.icns \
-  --ignore='^/(dist|dist-next|scripts|build/icon-1024\.png|\.gitignore|README\.md)' \
+  --ignore='^/(dist|dist-next|assets|scripts|build/icon-1024\.png|\.gitignore|README\.md)' \
   --app-bundle-id=com.harman.app
 
 if [ "$RUNNING" = 1 ]; then
