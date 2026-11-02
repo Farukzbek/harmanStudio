@@ -16,11 +16,27 @@ if [ ! -f build/icon.icns ] || [ build/icon.icns -ot scripts/make-icon.js ]; the
   rm -rf "$ICONSET"
 fi
 
+# Harman şu an açıksa onun dosyalarını silmek açık penceredeki çalışmayı bozabilir. Bu durumda yeni
+# sürüm ayrı bir klasöre (dist-next) derlenir, çalışan uygulamaya ve masaüstü kısayoluna dokunulmaz.
+OUT=dist
+RUNNING=0
+if pgrep -f "Harman.app/Contents/MacOS/Harman" >/dev/null 2>&1; then
+  RUNNING=1
+  OUT=dist-next
+  echo "Harman şu an çalışıyor: yeni sürüm $OUT/ klasörüne derlenir, açık uygulamaya dokunulmaz."
+fi
+
 ./node_modules/.bin/electron-packager . Harman \
-  --platform=darwin --arch=arm64 --out=dist --overwrite \
+  --platform=darwin --arch=arm64 --out="$OUT" --overwrite \
   --icon=build/icon.icns \
-  --ignore='^/(dist|scripts|build/icon-1024\.png|\.gitignore|README\.md)' \
+  --ignore='^/(dist|dist-next|scripts|build/icon-1024\.png|\.gitignore|README\.md)' \
   --app-bundle-id=com.harman.app
+
+if [ "$RUNNING" = 1 ]; then
+  echo "Hazır: $PWD/$OUT/Harman-darwin-arm64/Harman.app"
+  echo "Çalışmanı bitirip Harman'ı kapattıktan sonra tekrar 'npm run package' çalıştır; kısayol o zaman güncellenir."
+  exit 0
+fi
 
 APP="$PWD/dist/Harman-darwin-arm64/Harman.app"
 LINK="$HOME/Desktop/Harman.app"

@@ -34,9 +34,11 @@
       </button>
     </div>
 
-    <div id="lcd" class="lcd" title="Oynatma konumu / toplam süre. Tıkla ve gitmek istediğin süreyi yaz">
-      <span id="time">0:00.00</span>
+    <div id="lcd" class="lcd" title="Oynatma konumu (saniye) ve dakika:saniye / toplam süre. Tıkla ve gitmek istediğin saniyeyi yaz">
+      <span id="time">0.00</span>
       <input id="time-input" type="text" aria-label="Şu süreye git" autocomplete="off" spellcheck="false" hidden>
+      <span class="dim unit">sn</span>
+      <span id="time-min" class="dim">0:00.00</span>
       <span id="total" class="dim">/ 0:00.00</span>
     </div>
 

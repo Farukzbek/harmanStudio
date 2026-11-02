@@ -51,7 +51,7 @@ const keys = { ctrl: false };   // gerçek Ctrl tuşu (trackpad sıkıştırmas�
 const $ = (id) => document.getElementById(id);
 const el = {
   timeline: $('timeline'), ruler: $('ruler'), rulerCanvas: $('ruler-canvas'), tracks: $('tracks'),
-  playhead: $('playhead'), empty: $('empty'), time: $('time'), total: $('total'), toast: $('toast'),
+  playhead: $('playhead'), empty: $('empty'), time: $('time'), timeMin: $('time-min'), total: $('total'), toast: $('toast'),
   zoom: $('zoom'), btnPlay: $('btn-play'), btnStart: $('btn-start'), btnAdd: $('btn-add'),
   btnExport: $('btn-export'), normalize: $('normalize'),
   insEmpty: $('inspector-empty'), insBody: $('inspector-body'), insName: $('ins-name'), insChip: $('ins-chip'),
@@ -133,7 +133,7 @@ function buildCurve(ramps, fromKey, toKey, base) {
     if (r[toKey] === undefined) continue;
     const from = r[fromKey] ?? prev ?? base;
     if (prev === null) {
-      pts.push({ t: 0, v: from });
+      pts.push({ t: Math.min(0, r.start), v: from });
     } else if (Math.abs(from - prev) > 1e-6 && r.start - 0.01 > pts[pts.length - 1].t) {
       pts.push({ t: r.start - 0.01, v: prev });      // önceki değeri geçişin hemen öncesine kadar tut
     }
@@ -578,7 +578,8 @@ function updatePlayheadUI() {
   const x = GUTTER + state.playhead * state.pps;
   el.playhead.style.left = `${x}px`;
   el.playhead.hidden = x - el.timeline.scrollLeft < GUTTER - 1;
-  el.time.textContent = formatTime(state.playhead, 2);
+  el.time.textContent = state.playhead.toFixed(2);            // büyük: saniye
+  el.timeMin.textContent = formatTime(state.playhead, 2);     // küçük: dakika:saniye
 }
 
 // Seçim: birincil klip (yan panel) + tüm seçili klipler. Shift+tıkla seçime ekler/çıkarır.
@@ -823,7 +824,7 @@ function buildStemBlock(name) {
   );
   const hint = document.createElement('p');
   hint.className = 'hint';
-  hint.textContent = 'Üstteki + sesi kademeli artırır, − kademeli azaltır. Saniyeler parçanın sol kenarından itibaren sayılır; kaçıncı saniyede başlayıp kaçıncı saniyede biteceğini yaz. Seviye, başlangıç yüzdesinden hedef yüzdesine kademeli geçer; geçişten önce başlangıç, sonra hedef seviyesinde kalır. Seviye kutularını boş bırakırsan yalnızca yön değişir.';
+  hint.textContent = 'Üstteki + sesi kademeli artırır, − kademeli azaltır. Saniyeler zaman çizelgesindeki saniyelerdir (cetvelde ve sol üstteki sayaçta gördüğün); kaçıncı saniyede başlayıp kaçıncı saniyede biteceğini yaz. Seviye, başlangıç yüzdesinden hedef yüzdesine kademeli geçer; geçişten önce başlangıç, sonra hedef seviyesinde kalır. Seviye kutularını boş bırakırsan yalnızca yön değişir.';
   panel.append(list, dirRow, form, hint);
 
   // Yön seçilince başlangıç/hedef değerleri yöne uyar; değerler elle yazılınca yön düğmesi ona uyar.
@@ -848,16 +849,16 @@ function buildStemBlock(name) {
   lvFrom.addEventListener('input', syncDirFromValues);
   lvTo.addEventListener('input', syncDirFromValues);
 
-  // Saniyeler parçanın sol kenarından itibaren sayılır (kırpılmış ya da bölünmüş parçada da,
-  // ekranda gördüğün gibi). Varsayılan başlangıç: oynatma çizgisi parçanın içindeyse orası.
   const prefill = () => {
     const c = selected();
     if (!c) return;
-    const rel = state.playhead - c.start;
-    const from = rel >= 0 && rel <= c.dur ? rel : 0;
-    const srcT = from + c.offset;
+    // Saniyeler zaman çizelgesindeki (cetvel ve sayaçtaki) saniyelerdir. Varsayılan: oynatma çizgisi
+    // parçanın içindeyse orası, değilse parçanın başı.
+    const inside = state.playhead >= c.start && state.playhead < clipEnd(c) - 1;
+    const from = inside ? state.playhead : c.start;
+    const srcT = c.offset + (from - c.start);
     start.value = Math.round(from * 10) / 10;
-    end.value = Math.round(Math.min(from + 10, c.dur) * 10) / 10;
+    end.value = Math.round(Math.min(from + 10, clipEnd(c)) * 10) / 10;
     lvFrom.value = Math.round(curveAt(levelCurve(c, name), srcT, stemGain(c, name)) * 100);
     lvTo.value = dir === 'up' ? 100 : 0;
     if (Number(lvFrom.value) === Number(lvTo.value)) lvFrom.value = dir === 'up' ? 0 : 100;
@@ -920,15 +921,17 @@ function updateStems(clip) {
 
     const ramps = stemRamps(clip, name);
     row.toggle.textContent = `${row.panel.hidden ? '▸' : '▾'} Zamanlı geçişler${ramps.length ? ` (${ramps.length})` : ''}`;
-    const rampsKey = `${JSON.stringify(ramps)}|${clip.offset}|${clip.dur}`;
+    const rampsKey = `${JSON.stringify(ramps)}|${clip.offset}|${clip.dur}|${clip.start}`;
     if (rampsKey !== row.rampsKey) {
       row.rampsKey = rampsKey;
       row.list.replaceChildren(...ramps.map((r, i) => {
         const item = document.createElement('div');
         item.className = 'ramp-item';
         const text = document.createElement('span');
-        const outside = r.end <= clip.offset || r.start >= clip.offset + clip.dur;
-        const parts = [`${fmtSec(r.start - clip.offset)} → ${fmtSec(r.end - clip.offset)}`];
+        // Saklanan şarkı saniyeleri, parçanın şu anki konumuna göre zaman çizelgesi saniyesine çevrilir.
+        const tl = (t) => clip.start + (t - clip.offset);
+        const outside = tl(r.end) <= clip.start || tl(r.start) >= clipEnd(clip);
+        const parts = [`${fmtSec(tl(r.start))} → ${fmtSec(tl(r.end))}`];
         if (r.to !== undefined) parts.push(`${r.from !== undefined ? `%${Math.round(r.from * 100)}` : '…'} → %${Math.round(r.to * 100)}`);
         if (r.panTo !== undefined) parts.push(`${panShort(r.panFrom ?? 0)} → ${panShort(r.panTo)}`);
         if (outside) parts.push('parça dışında');
@@ -951,12 +954,14 @@ function updateStems(clip) {
 function addRamp(name, spec) {
   const clip = selected();
   if (!clip) return;
-  // Girilen saniyeler parçanın sol kenarından itibaren; saklanırken şarkı saniyesine çevrilir ki
-  // sonradan parçayı taşısan, bölsen ya da kırpsan geçiş sesin aynı yerinde kalsın.
+  // Girilen saniyeler zaman çizelgesindeki saniyelerdir (cetvelde ve sayaçta gördüğün). Saklanırken
+  // şarkı saniyesine çevrilir ki parçayı taşısan, bölsen ya da kırpsan geçiş sesin aynı yerinde kalsın.
   const { start, end } = spec;
   if (![start, end].every(Number.isFinite)) return toast('Başlangıç ve bitiş saniyesini yaz');
-  if (start < 0 || start >= clip.dur) return toast(`Başlangıç, parçanın başından itibaren 0 ile ${fmtSec(clip.dur)} arasında olmalı`);
   if (end <= start) return toast('Bitiş, başlangıçtan sonra olmalı');
+  if (end <= clip.start || start >= clipEnd(clip)) {
+    return toast(`Bu aralık parçanın dışında kalıyor. Bu parça zaman çizelgesinde ${fmtSec(clip.start)} ile ${fmtSec(clipEnd(clip))} arasında`, true);
+  }
   const pair = (a, b, label) => {
     const filled = [a, b].filter((v) => v !== undefined);
     if (filled.length === 1) { toast(`${label}: başı ve sonu birlikte yazılmalı`); return false; }
@@ -968,7 +973,8 @@ function addRamp(name, spec) {
   if (hasPan === false && (spec.panFrom !== undefined || spec.panTo !== undefined)) return;
   if (!hasLevel && !hasPan) return toast('Seviye veya yön değerlerini yaz');
 
-  const ramp = { start: start + clip.offset, end: Math.min(end, clip.dur) + clip.offset };
+  const toSrc = (t) => clip.offset + (t - clip.start);
+  const ramp = { start: toSrc(start), end: toSrc(end) };
   if (hasLevel) { ramp.from = clamp(spec.from, 0, 100) / 100; ramp.to = clamp(spec.to, 0, 100) / 100; }
   if (hasPan) { ramp.panFrom = clamp(spec.panFrom, -100, 100) / 100; ramp.panTo = clamp(spec.panTo, -100, 100) / 100; }
   mutate(() => {
@@ -2804,7 +2810,7 @@ function closeTimeInput() {
 }
 $('lcd').addEventListener('click', () => {
   if (!timeInput.hidden) return;
-  timeInput.value = formatTime(state.playhead, 2).replace(/^0:/, '');
+  timeInput.value = state.playhead.toFixed(2);
   el.time.hidden = true;
   timeInput.hidden = false;
   timeInput.focus();

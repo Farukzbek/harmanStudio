@@ -14,7 +14,7 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Fareyle dikdörtgen çizerek toplu seçim; seçili parçaları birlikte taşı, böl, çoğalt, sil. Sürüklerken görünümün kenarına gelince otomatik kayar
 - Her hattın sağ altında bir kutucuk: kapatırsan o hattaki parçalar çalmaz (kaydedilen mix'e de girmez)
 - Her parça bağımsızdır: bir şarkıdan kesilen, çoğaltılan veya yapıştırılan parçaların BPM/ton düzeltmesi, vokal ayırma sonucu, tempo/ton değişikliği, zamanlı geçişleri ve sıfırlaması kendilerine aittir. Ses verisi paylaşıldığı için bellek harcanmaz; aynı sesten ayrılmış parçalar varsa yeniden hesaplanmadan kullanılır
-- Çalarken yakınlaştır (⌥ + kaydır, trackpad'de sıkıştır), sağa sola git, istediğin saniyeye tıkla veya süre yaz; Boşluk son tıklanan yerden oynatır
+- Çalarken yakınlaştır (⌥ + kaydır, trackpad'de sıkıştır), sağa sola git, istediğin saniyeye tıkla veya yaz; Boşluk son tıklanan yerden oynatır. Sol üstteki sayaç büyükte saniyeyi (61.37), küçükte dakika:saniyeyi (1:01.37) gösterir
 
 **Ses ve karışım**
 - Parça başına ses seviyesi (dB) ve sol / sağ denge
@@ -79,7 +79,7 @@ Ayrılmış bir ses parçasının (ör. Davul) altındaki **Zamanlı geçişler*
 2. Başlangıç ve bitiş saniyesini, seviye başı ve sonu yüzdesini yaz. İstersen "Yönü de değiştir"i işaretleyip sol/sağ başı ve sonu (−100 tam sol, +100 tam sağ) gir. Seviye kutularını boş bırakırsan yalnızca yön değişir.
 3. **Geçiş ekle**. Geçişten önce başlangıç, sonra hedef değerinde kalır. Geçişi olan değerin kaydırıcısı kilitlenir ("Zamanlı"); geçişleri listeden silebilirsin.
 
-Saniyeler **parçanın sol kenarından** itibaren sayılır (kırpılmış, bölünmüş veya taşınmış parçada da ekranda gördüğün gibi). Arka planda şarkı saniyesine çevrildiği için parçayı taşırsan geçiş sesin aynı yerinde kalır. Çalan kısmın dışında kalan bir geçiş listede "parça dışında" diye işaretlenir.
+Saniyeler **zaman çizelgesindeki** saniyelerdir (cetvelde ve sol üstteki sayaçta gördüğün). Arka planda şarkı saniyesine çevrildiği için parçayı taşırsan, kırparsan veya bölersen geçiş sesin aynı yerinde kalır. Aralığın bir kısmı parçanın dışına taşabilir (geçiş o kadarıyla uygulanır); tamamen dışındaysa uygulama parçanın zaman çizelgesinde nerede olduğunu söyler ve listede "parça dışında" diye işaretlenir.
 
 ## Tempo ve ton eşleştirme
 
@@ -140,7 +140,7 @@ Uygulama içinde `⌘/` ile tam liste açılır.
 | ⌃ + kaydır, ⇧ + kaydır | Sağa sola git |
 | ⌘0 | Tümünü sığdır |
 | Boş alana / cetvele / klibe tıkla | Oynatma çizgisini oraya taşır (çalarken de) |
-| Süre sayacına tıkla | Süre yazarak git (1:23 veya 83) |
+| Süre sayacına tıkla | Saniye yazarak git (83 veya 1:23) |
 | ⌘ basılıyken sürükle | Yapışmayı kapat |
 | Sürgüye çift tıkla veya değerine tıkla | Varsayılan değere dön |
 
