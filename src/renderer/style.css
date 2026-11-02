@@ -954,3 +954,5 @@ input[type="range"]:disabled { opacity: 0.45; }
 .am-dur input { width: 64px; }
 #am-preview { white-space: pre-line; max-height: 18vh; overflow: auto; }
 .am-actions { margin-top: 10px; justify-content: flex-end; }
+
+#lib-folder { margin-top: 6px; }

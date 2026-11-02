@@ -29,6 +29,8 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Pencere boyutu ve konumu hatırlanır
 - Döngüde dinleme (**L**): seçili parçayı ya da uyguladığın geçişi tekrar tekrar çal; geçiş uygularken "Uygula ve döngüde dinle" geçiş bölgesini döngüye alır
 - Yakınlaşınca dalga formunda vuruş çizgileri (her 4 vuruş belirgin) görünür; kesim ve geçişleri vuruşa oturtmak kolaylaşır
+- Alt çubukta çıkış seviye göstergesi: son 1,5 saniyenin tepesi dB olarak görünür; 0 dB aşılınca "TEPE" yanar (tıklayınca sıfırlanır). Normalize açıkken kayıtta zaten kısılır
+- Geri alma geçmişi (Düzen menüsü): her adımın ne yaptığı listelenir, bir adıma tıklayıp o noktaya dönebilir, geri aldıklarını yeniden uygulayabilirsin
 - Çalarken yakınlaştır (⌥ + kaydır, trackpad'de sıkıştır), sağa sola git, istediğin saniyeye tıkla veya yaz; Boşluk son tıklanan yerden oynatır. Sol üstteki sayaç büyükte saniyeyi (61.37), küçükte dakika:saniyeyi (1:01.37) gösterir
 
 **Ses ve karışım**
@@ -41,11 +43,12 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Sürgülerin yanındaki değere (ör. "Sağ 3", "%80") tıklamak varsayılana döndürür
 
 **Tempo ve ton**
+- **Ritme vur** (T): BPM yanlış çıkarsa müzik çalarken ritme vurarak düzelt (3+ vuruş)
 - Otomatik BPM, ton (Camelot koduyla) ve ilk vuruş analizi; klip başlığında "124 BPM · 8A" etiketi
 - Bir parçayı diğerinin tempoyuna ve tonuna getir (Rubber Band ile), vuruşları hizala
-- **Şarkıları otomatik sırala ve karıştır** (Düzen menüsü): seçili parçaları (ya da hepsini) tempo ve tona göre en uygun sıraya dizer, her çift için en iyi geçişi uygular. Tek geri alma adımıdır
+- **Şarkıları otomatik sırala ve karıştır** (Düzen menüsü): önce bir pencere açılır; dahil edilecek şarkıları seçersin, ilk çalacak olanı işaretlersin, tempo/tonca çok uyumsuz şarkıların atlanmasını ve hedef süreyi (ör. 45 dk) belirlersin, sıra canlı önizlenir. Sonra her çift için en iyi geçiş uygulanır; tek geri alma adımıdır
 - **Geçiş şablonları:** uzunluk, bas takası, tempo ve ton eşitleme ayarlarını hazır ya da kendi şablonlarınla tek tıkla uygula
-- **Uyumlu şarkılar:** Harman analiz ettiği her şarkıyı hatırlar (bu bilgisayarda, dosya yoluyla); bir parçayı seçip "Kütüphanede uyumlu şarkı bul"a basınca tempo ve tonca en yakın şarkıları önerir, tek tıkla projeye ekler
+- **Uyumlu şarkılar:** Harman analiz ettiği her şarkıyı hatırlar (bu bilgisayarda, dosya yoluyla); "Müzik klasörü ekle" ile bir klasörü arka planda analiz ettirip kütüphaneyi hızla doldurabilirsin (yalnızca BPM / ton bilgisi saklanır). Bir parçayı seçip "Kütüphanede uyumlu şarkı bul"a basınca tempo ve tonca en yakın şarkıları önerir, tek tıkla projeye ekler
 - Akıllı geçiş önerileri: iki parça için en iyi 3 geçişi önerir ve tek tıkla uygular. Geçiş uzunluğu 8 / 16 / 32 vuruş seçilebilir
 
 **Başlangıç**
@@ -189,6 +192,7 @@ Uygulama içinde `⌘/` ile tam liste açılır.
 | ← / → | 1 sn geri / ileri (⇧ ile 5 sn). Çizgi ekran dışına çıkarsa görünüm bir sayfa kayar |
 | ⌘ + ← / → | İnce adım: yakınlığa göre yaklaşık 8 piksel (⇧ ile 5 kat) |
 | ⌥ + ← / → | Önceki / sonraki parça kenarına atla |
+| T | BPM'i ritme vurarak ayarla |
 | M | Oynatma çizgisine işaretçi koy |
 | ⌥M / ⌥S | Seçili parçayı sessize al / solo |
 | F2 | Seçili parçayı yeniden adlandır |

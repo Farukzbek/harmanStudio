@@ -293,6 +293,29 @@ ipcMain.handle('library-upsert', (_e, entry) => {
 });
 ipcMain.handle('library-list', () => Object.values(readLibrary()).filter((e) => fs.existsSync(e.path)));
 
+// Kütüphaneye eklemek için klasör seçtirir ve içindeki (alt klasörler dahil) ses dosyalarını listeler.
+async function listAudio(dir, out = [], depth = 0) {
+  if (depth > 6 || out.length >= 800) return out;
+  let entries;
+  try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    if (e.name.startsWith('.')) continue;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) await listAudio(full, out, depth + 1);
+    else if (AUDIO_EXTS.includes(path.extname(e.name).slice(1).toLowerCase())) out.push(full);
+    if (out.length >= 800) break;
+  }
+  return out;
+}
+ipcMain.handle('library-pick-folder', async (e) => {
+  // HARMAN_LIB_DIR yalnızca test içindir (diyalogu atlar).
+  const { canceled, filePaths } = process.env.HARMAN_LIB_DIR ? { canceled: false, filePaths: [process.env.HARMAN_LIB_DIR] } : await dialog.showOpenDialog(winOf(e), {
+    title: 'Müzik klasörünü seç', defaultPath: app.getPath('music'), properties: ['openDirectory'], buttonLabel: 'Klasörü ekle',
+  });
+  if (canceled || !filePaths[0]) return null;
+  return { dir: filePaths[0], files: await listAudio(filePaths[0]) };
+});
+
 // Birden çok dosyayı bir klasöre yazar (bölünmüş mix, ayrı ses parçaları). Klasörü kullanıcı seçer.
 const safeName = (name) => String(name).replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Dosya';
 ipcMain.handle('save-batch', async (e, { files, format, kbps, title }) => {

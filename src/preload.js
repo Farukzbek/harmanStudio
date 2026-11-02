@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('harman', {
   saveBatch: (files, format, kbps, title) => ipcRenderer.invoke('save-batch', { files, format, kbps, title }),
   chooseFormat: (message, detail) => ipcRenderer.invoke('choose-format', { message, detail }),
   libraryUpsert: (entry) => ipcRenderer.invoke('library-upsert', entry),
+  libraryPickFolder: () => ipcRenderer.invoke('library-pick-folder'),
   libraryList: () => ipcRenderer.invoke('library-list'),
   engineStatus: () => ipcRenderer.invoke('engine-status'),
   installEngine: () => ipcRenderer.invoke('engine-install'),

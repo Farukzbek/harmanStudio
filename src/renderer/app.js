@@ -78,7 +78,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), history: $('history'), historyList: $('history-list'), meterBar: $('st-meter-bar'), peakText: $('st-peak'), meter: $('st-meter'), libFind: $('lib-find'), libList: $('lib-list'), libHint: $('lib-hint'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), history: $('history'), historyList: $('history-list'), meterBar: $('st-meter-bar'), peakText: $('st-peak'), meter: $('st-meter'), libFind: $('lib-find'), libFolder: $('lib-folder'), libList: $('lib-list'), libHint: $('lib-hint'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -1448,6 +1448,46 @@ async function findCompatible() {
   }
 }
 el.libFind.addEventListener('click', findCompatible);
+
+// Müzik klasörü ekleme: klasördeki şarkılar sırayla çözülür ve analiz edilir, yalnızca BPM / ton bilgisi
+// kütüphaneye yazılır (ses belleğe tutulmaz, projeye parça eklenmez). Durdur ile yarıda kesilebilir.
+const libScan = { running: false, cancel: false };
+async function scanLibraryFolder() {
+  if (libScan.running) { libScan.cancel = true; el.libFolder.textContent = 'Durduruluyor…'; return; }
+  const picked = await window.harman.libraryPickFolder();
+  if (!picked) return;
+  const known = new Set((await window.harman.libraryList()).map((e) => e.path));
+  const todo = picked.files.filter((f) => !known.has(f));
+  if (!picked.files.length) return toast('Bu klasörde ses dosyası bulunamadı');
+  if (!todo.length) return toast(`Klasördeki ${picked.files.length} şarkı zaten kütüphanede`);
+  libScan.running = true;
+  libScan.cancel = false;
+  el.libFolder.textContent = 'Durdur';
+  let done = 0;
+  let failed = 0;
+  for (const file of todo) {
+    if (libScan.cancel) break;
+    const name = file.split('/').pop().replace(/\.[^.]+$/, '');
+    el.libHint.textContent = `Analiz ediliyor ${done + failed + 1} / ${todo.length}: ${name}`;
+    try {
+      const buffer = await decodeFile(file);
+      const channels = [buffer.getChannelData(0)];
+      if (buffer.numberOfChannels > 1) channels.push(buffer.getChannelData(1));
+      const r = await Analysis.analyzeSamples(channels, SAMPLE_RATE);
+      await window.harman.libraryUpsert({ path: file, name, bpm: r.bpm, key: { tonic: r.key.tonic, mode: r.key.mode }, dur: buffer.duration });
+      done++;
+    } catch (err) {
+      console.error('Kütüphane analizi başarısız', file, err);
+      failed++;
+    }
+    await new Promise((r) => setTimeout(r, 30));          // arayüze nefes aldır
+  }
+  libScan.running = false;
+  el.libFolder.textContent = 'Müzik klasörü ekle…';
+  el.libHint.textContent = libScan.cancel ? `Durduruldu: ${done} şarkı eklendi.` : `Bitti: ${done} şarkı eklendi${failed ? `, ${failed} dosya okunamadı` : ''}.`;
+  toast(el.libHint.textContent);
+}
+el.libFolder.addEventListener('click', scanLibraryFolder);
 
 // Parça rengi: seçili tüm parçalara uygulanır. "Hat rengi" (kesikli) elle seçimi kaldırır.
 for (const hue of [...CLIP_HUES, 'auto']) {
