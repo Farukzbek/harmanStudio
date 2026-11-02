@@ -298,10 +298,27 @@
     return s > 6 ? s - 12 : s;
   }
 
+  // Şarkının enerji eğrisi: her ENERGY_HOP saniyede bir RMS. Geçiş önerileri "bu noktadan sonra ses
+  // sakinleşiyor mu, bu giriş sakin mi" sorularını buradan cevaplar.
+  const ENERGY_HOP = 0.5;
+  function energyCurve(x, sampleRate) {
+    const block = Math.round(ENERGY_HOP * sampleRate);
+    const n = Math.ceil(x.length / block);
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      const end = Math.min(x.length, (i + 1) * block);
+      for (let j = i * block; j < end; j++) sum += x[j] * x[j];
+      out[i] = Math.sqrt(sum / Math.max(1, end - i * block));
+    }
+    return out;
+  }
+
   // ------------------------------------------------------------- ana giriş
   // channels: Float32Array[] (kanal verileri), sampleRate: Hz.
   async function analyzeSamples(channels, sampleRate, onProgress = () => {}) {
     let mono = toMono(channels);
+    const energy = energyCurve(mono, sampleRate);     // kırpmadan önce, tüm şarkı için
     const maxLen = MAX_SECONDS * sampleRate;
     let startOffsetSec = 0;
     if (mono.length > maxLen) {
@@ -334,6 +351,8 @@
       beatPhase: phase,
       beatStrength: fine.strength,
       key,
+      energy,
+      energyHop: ENERGY_HOP,
     };
   }
 

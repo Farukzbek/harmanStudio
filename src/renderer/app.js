@@ -74,6 +74,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
+  transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -224,6 +225,20 @@ function endEdit() {
   state.pending = null;
 }
 function mutate(fn) { beginEdit(); fn(); endEdit(); }
+
+// Birden çok düzenlemeyi (ör. tempo + konum + fade) tek geri alma adımına toplar.
+async function groupUndo(fn) {
+  const depth = state.undo.length;
+  const before = snapshot();
+  try {
+    await fn();
+  } finally {
+    if (state.undo.length > depth) {
+      state.undo.length = depth;
+      if (snapshot() !== before) commitUndo(before);
+    }
+  }
+}
 
 function restore(snap) {
   state.clips.forEach((c) => c.el.remove());
@@ -1851,7 +1866,10 @@ async function analyzeSource(srcId) {
     const channels = [src.buffer.getChannelData(0)];
     if (src.buffer.numberOfChannels > 1) channels.push(src.buffer.getChannelData(1));
     const r = await Analysis.analyzeSamples(channels, SAMPLE_RATE);
-    Object.assign(src, { bpm: r.bpm, beatPhase: r.beatPhase, key: { tonic: r.key.tonic, mode: r.key.mode }, analysis: 'done' });
+    Object.assign(src, {
+      bpm: r.bpm, beatPhase: r.beatPhase, key: { tonic: r.key.tonic, mode: r.key.mode },
+      energy: r.energy, energyHop: r.energyHop, analysis: 'done',
+    });
   } catch (err) {
     console.error('Analiz başarısız', err);
     src.analysis = 'failed';
@@ -1948,8 +1966,10 @@ function updateTempo(clip) {
 
   el.matchBox.hidden = !cands.length && !derived;
   const plan = matchPlan(clip);
-  const lines = [el.matchTempo, el.matchKey, el.matchApply, el.matchAlign, el.matchRef];
-  lines.forEach((b) => { b.closest('.match-line, .actions, .inline-row').hidden = !plan; });
+  const lines = [el.matchTempo, el.matchKey, el.matchApply, el.matchAlign, el.matchRef, el.transFind];
+  lines.forEach((b) => { b.closest('.match-line, .actions, .inline-row, .trans').hidden = !plan; });
+  const transKey = `${clip.id}:${tempo.refId}`;
+  if (tempo.transKey !== transKey) { tempo.transKey = transKey; el.transList.replaceChildren(); }
   el.matchReset.hidden = !derived;
   if (!plan) { el.matchWarn.hidden = true; return; }
 
@@ -2035,6 +2055,7 @@ async function deriveSource(rootId, rate, semis) {
     stems: stemParts.length ? Object.fromEntries(stemParts.map((p) => [p.name, { buffer: p.buffer, peaks: p.peaks }])) : undefined,
     origin: { srcId: rootId, rate, semis },
     bpm: root.bpm * rate, beatPhase: root.beatPhase / rate,
+    energy: root.energy, energyHop: root.energyHop / rate,
     key: Analysis.shiftKey(root.key, semis), analysis: 'done',
   });
   root.derived.set(cacheKey, id);
@@ -2401,6 +2422,7 @@ function clipMenu(time, track) {
     'sep',
     { label: 'Vokal / enstrüman ayır…', hint: '⇧⌘S', run: openSeparate },
     { label: 'Tempo ve tonu eşleştir…', hint: '⇧⌘M', run: showMatchPanel },
+    { label: 'Geçiş önerileri…', run: () => { showMatchPanel(); findTransitions(); } },
     { label: 'Parçayı sıfırla…', disabled: !primary || isPristine(primary), run: () => el.insReset.click() },
     'sep',
     { label: many ? 'Seçilenleri sil' : 'Sil', hint: '⌫', danger: true, run: deleteSelected },
@@ -2435,6 +2457,146 @@ el.timeline.addEventListener('contextmenu', (e) => {
     showContextMenu(e.clientX, e.clientY, laneMenu(time, track));
   }
 });
+
+// ------------------------------------------------------------ akıllı geçiş önerileri
+// Seçili parça giren parça (B), referans parça çıkan parça (A). Öneriler tempo, ton, enerji ve vuruş
+// ızgarasına bakar (transitions.js); uygulayınca B konumlanır, A geçiş yerinde biter, ikisine
+// crossfade verilir ve istenirse B'nin tempo ve tonu ayarlanır. Hepsi tek geri alma adımıdır.
+function describeForTransition(clip) {
+  const src = sourceOf(clip);
+  return {
+    bpm: src.bpm, beatPhase: src.beatPhase, key: src.key, rootKey: rootOf(clip).root.key,
+    energy: src.energy, energyHop: src.energyHop, offset: clip.offset, dur: clip.dur, start: clip.start,
+  };
+}
+
+function findTransitions() {
+  const b = selected();
+  const a = state.clips.find((c) => c.id === tempo.refId);
+  if (!b || !a) return toast('Önce giren parçayı seç ve referans (çıkan) parçayı belirle');
+  const list = Transitions.suggestTransitions(describeForTransition(a), describeForTransition(b), Analysis);
+  renderTransitions(list, a, b);
+}
+
+function renderTransitions(list, a, b) {
+  if (!list.length) {
+    const none = document.createElement('p');
+    none.className = 'hint';
+    none.textContent = 'Uygun bir geçiş noktası bulunamadı. Parçalar çok kısa veya giren parça için yeterli alan yok.';
+    el.transList.replaceChildren(none);
+    return;
+  }
+  const bSrc = sourceOf(b);
+  el.transList.replaceChildren(...list.map((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'trans-card';
+    const head = document.createElement('div');
+    head.className = 'trans-head';
+    const title = document.createElement('b');
+    title.textContent = `${i + 1}. ${formatTime(s.tlA, 0)} noktasında geç`;
+    const score = document.createElement('span');
+    score.className = 'score';
+    score.textContent = `Puan ${s.score}`;
+    head.append(title, score);
+
+    const lines = [
+      s.entryKind === 'drop'
+        ? `${b.name}'nin ${formatTime(s.bPoint, 0)}'deki güçlü bölümü, ${a.name} bittiği anda (${formatTime(s.tlA, 0)}) devreye girer; öncesinde ${s.lead.toFixed(1).replace('.', ',')} sn karışım`
+        : `${b.name} baştan girer; ${a.name} ${formatTime(s.tlA, 0)}'den itibaren ${s.crossfade.toFixed(1).replace('.', ',')} sn (${Math.round(s.beats)} vuruş) crossfade ile biter`,
+      Math.abs(s.tempoPct) < 0.0005
+        ? `Tempo zaten ${fmtBpm(bSrc.bpm)} BPM`
+        : `Tempo ${fmtBpm(bSrc.bpm)} → ${fmtBpm(s.targetBpm)} BPM (${s.tempoPct > 0 ? '+' : ''}${(s.tempoPct * 100).toFixed(1).replace('.', ',')}%)`,
+      s.semis === 0 ? 'Tonlar uyumlu' : `Ton ${s.semis > 0 ? '+' : ''}${s.semis} yarım ton kaydırılır${Math.abs(s.semis) > 3 ? ' (büyük kaydırma sesi bozabilir)' : ''}`,
+      ...s.reasons,
+    ];
+    const body = document.createElement('ul');
+    body.className = 'trans-lines';
+    for (const text of lines) {
+      const li = document.createElement('li');
+      li.textContent = text;
+      body.appendChild(li);
+    }
+    const actions = document.createElement('div');
+    actions.className = 'trans-actions';
+    const apply = document.createElement('button');
+    apply.className = 'btn primary mini';
+    apply.textContent = 'Uygula';
+    apply.addEventListener('click', () => applyTransition(s, a.id, b.id, false));
+    const listen = document.createElement('button');
+    listen.className = 'btn solid mini';
+    listen.textContent = 'Uygula ve dinle';
+    listen.addEventListener('click', () => applyTransition(s, a.id, b.id, true));
+    actions.append(apply, listen);
+    card.append(head, body, actions);
+    return card;
+  }));
+}
+
+async function applyTransition(s, aId, bId, listen) {
+  const a0 = state.clips.find((c) => c.id === aId);
+  const b0 = state.clips.find((c) => c.id === bId);
+  if (!a0 || !b0) return toast('Parçalar değişmiş, önerileri yeniden bul');
+  const srcB = sourceOf(b0);
+  const rootB = rootOf(b0).root;
+  const curRate = srcB.origin?.rate ?? 1;
+  const curSemis = srcB.origin?.semis ?? 0;
+  // Tempo ve ton, eşleştirme bölümündeki kutulara uyar: kapalıysa yalnızca konum ve geçiş uygulanır.
+  const wantRate = tempo.doTempo ? Math.round((s.targetBpm / rootB.bpm) * 1e5) / 1e5 : curRate;
+  const wantSemis = tempo.doKey ? s.semis : curSemis;
+  const needRetarget = Math.abs(wantRate - curRate) > 0.0005 || wantSemis !== curSemis;
+
+  let tlA = 0;
+  const job = () => groupUndo(async () => {
+    let bPoint = s.bPoint;
+    if (needRetarget) {
+      await retarget(bId, Math.abs(wantRate - 1) < 0.0005 ? null : wantRate * rootB.bpm, wantSemis);
+      const rateNow = sourceOf(state.clips.find((c) => c.id === bId)).origin?.rate ?? 1;
+      bPoint *= curRate / rateNow;          // B'nin kaynak saniyeleri yeni tempoya göre ölçeklenir
+    }
+    const a = state.clips.find((c) => c.id === aId);
+    const b = state.clips.find((c) => c.id === bId);
+    mutate(() => {
+      tlA = a.start + (s.aPoint - a.offset);
+      let fade = s.crossfade;
+      if (s.entryKind === 'drop') {
+        // B'nin güçlü bölümü A'nın bittiği vuruşa iner: B'nin girişi bir crossfade uzunluğuna kısalır,
+        // A'nın sonuyla karışır, ardından A biter ve B'nin güçlü bölümü başlar.
+        fade = Math.min(s.crossfade, bPoint - b.offset);
+        const cut = bPoint - fade - b.offset;
+        b.offset += cut;
+        b.dur -= cut;
+        b.start = Math.max(0, tlA - fade);
+        if (tlA < clipEnd(a) - 0.01) a.dur = tlA - a.start;
+      } else {
+        b.start = Math.max(0, tlA - (bPoint - b.offset));      // B'nin ilk vuruşu A'nın geçiş vuruşuna oturur
+        if (tlA + fade < clipEnd(a) - 0.01) a.dur = tlA + fade - a.start;   // A, geçişin sonunda biter
+      }
+      a.fadeOut = Math.min(fade, a.dur);
+      limitFades(a, 'fadeOut');
+      b.fadeIn = fade;
+      limitFades(b, 'fadeIn');
+      if (b.track === a.track) {                              // iki parça aynı hatta olmasın
+        b.track = [0, 1, 2, 3].find((t) => t !== a.track);
+        laneOf(b.track).appendChild(b.el);
+      }
+      setSelection([b.id]);
+    });
+  });
+
+  if (needRetarget) {
+    const ok = await runBusy('Geçiş uygulanıyor', job);
+    if (!ok) return;
+  } else {
+    await job();
+  }
+  layoutAll();
+  syncSelectionUI();
+  goTo(Math.max(0, tlA - 6));
+  toast(`Geçiş uygulandı (${formatTime(tlA, 0)}). ⌘Z ile tek adımda geri alabilirsin`);
+  if (listen) play();
+}
+
+el.transFind.addEventListener('click', findTransitions);
 
 // ------------------------------------------------------------------ eylemler
 async function pickAndAdd() {

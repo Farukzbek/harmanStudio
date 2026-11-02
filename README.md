@@ -25,6 +25,7 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 **Tempo ve ton**
 - Otomatik BPM, ton (Camelot koduyla) ve ilk vuruş analizi; klip başlığında "124 BPM · 8A" etiketi
 - Bir parçayı diğerinin tempoyuna ve tonuna getir (Rubber Band ile), vuruşları hizala
+- Akıllı geçiş önerileri: iki parça için en iyi 3 geçişi önerir ve tek tıkla uygular
 
 **Çıktı**
 - MP3 (320 kbps) veya WAV; biçim kaydetme penceresindeki dosya türünden seçilir
@@ -95,6 +96,22 @@ Bilmen gerekenler:
 - Analiz ve eşleştirme sentetik şarkılarla doğrulandı (çeşitli davul kalıplarında tempo ±0,6 BPM, vuruş konumu ±20 ms). Gerçek müzikte doğruluk daha düşük olabilir.
 - İlk kullanımda küçük bir araç (≈ 30 MB) otomatik kurulur: `~/Library/Application Support/Harman/tools`.
 
+## Akıllı geçiş önerileri
+
+Giren parçayı seç, **Tempo ve ton → Başka bir parçaya eşleştir** bölümünde referansı (çıkan parça) belirle, **Geçiş öner**'e bas (sağ tık menüsünde de var). Uygulama en iyi 3 geçişi puanlayarak listeler. Puan şunlardan oluşur:
+
+- **Tempo:** giren parçayı çıkanın temposuna getirmek ne kadar küçük bir değişiklik
+- **Ton:** uyumlu tona gelmek için gereken yarım ton kaydırması (Camelot)
+- **Çıkış enerjisi:** çıkan parçanın enerjisi bu noktadan sonra düşüyor mu (outro, ara bölüm)
+- **Giriş:** giren parçanın girişi sakin mi, ya da güçlü bir bölümüne (drop) giriyor mu
+- **Konum:** geçiş çıkan parçanın sonuna uygun uzaklıkta mı
+
+Geçiş noktaları çıkan parçanın vuruş ızgarasında (8 vuruşluk adımlarla, 16 vuruşluk cümle başları tercih edilir) aranır. **Uygula** şunları tek adımda yapar (tek ⌘Z geri alır): giren parçayı vuruşlar oturacak şekilde konumlar, çıkan parçayı geçişte bitirir, ikisine eşit güçlü crossfade verir, iki parçayı farklı hatlara koyar. Tempo ve ton kutuları açıksa giren parçanın tempo ve tonunu da ayarlar. **Uygula ve dinle** geçişten 6 saniye önce çalmaya başlar.
+
+Bilmen gerekenler:
+- İki tür geçiş vardır: giren parça baştan girer (çıkan parça geçişten sonra crossfade ile biter) veya giren parçanın güçlü bölümü (drop) çıkan parçanın bittiği anda devreye girer (öncesinde bir crossfade uzunluğunda giriş karışır, giren parçanın fazla girişi atılır).
+- Öneriler çıkan parçanın son 110 saniyesinde aranır. Enerji, tempo ve vuruş analizi sentetik şarkılarla doğrulandı; gerçek müzikte öneri kalitesi değişebilir. Dinleyip beğenmezsen ⌘Z ile geri al.
+
 ## Kısayollar
 
 Uygulama içinde `⌘/` ile tam liste açılır.
@@ -136,7 +153,7 @@ src/engine.js          Vokal / enstrüman ayırma motoru (Python yan servisi) y�
 src/tempo.js           Tempo / ton aracı (Rubber Band) yönetimi
 src/pyenv.js           Python ortamı kurma ve süreç çalıştırma yardımcıları
 src/saveformat.js      Kaydetme yolundan biçim çıkarma
-src/renderer/          Arayüz: index.html, style.css, app.js (zaman çizelgesi, ses motoru), analysis.js (BPM / ton)
+src/renderer/          Arayüz: index.html, style.css, app.js (zaman çizelgesi, ses motoru), analysis.js (BPM / ton / enerji), transitions.js (geçiş önerileri)
 tools/separate.py      Ayırma motorunu bellek sınırıyla başlatır
 tools/stretch.py       Tempo / ton değiştirme (pedalboard / Rubber Band)
 scripts/               Derleme ve ikon betikleri
@@ -151,9 +168,11 @@ Ses, Web Audio ile arayüzde çalınır ve kaydedilir; ağır işler (ayırma, t
 - Zamanlı geçişler form ile girilir; parçanın üstünde fareyle çekilen bir eğri yok.
 - Toplu seçimde yan panel birincil parçayı gösterir; seviye ve fade gibi ayarlar şimdilik yalnızca o parçaya uygulanır.
 
-## Yol haritası
+## Fikirler
 
-1. Akıllı geçiş önerileri (en iyi geçiş noktası ve ton uyumu)
+- Zamanlı geçişleri parçanın üstünde fareyle çizme
+- Toplu seçimde seviye ve fade gibi ayarları tüm seçili parçalara birden uygulama
+- Geçiş önerilerinde değişken crossfade uzunluğu (8 / 16 / 32 vuruş)
 
 ## Lisans ve üçüncü parti notları
 

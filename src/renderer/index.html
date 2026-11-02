@@ -168,6 +168,11 @@
                 <button id="match-align" class="btn solid" title="Vuruşları referansla aynı ızgaraya oturtur">Vuruşları hizala</button>
               </div>
               <button id="match-reset" class="btn solid wide" hidden>Orijinal tempo ve tona dön</button>
+
+              <div class="trans">
+                <button id="trans-find" class="btn solid wide" title="Referans parçadan bu parçaya en iyi geçişi önerir">Geçiş öner</button>
+                <div id="trans-list" class="trans-list"></div>
+              </div>
             </div>
           </div>
         </section>
@@ -328,6 +333,7 @@
 
   <div id="toast" class="toast" hidden></div>
   <script src="analysis.js"></script>
+  <script src="transitions.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
