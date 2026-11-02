@@ -39,7 +39,7 @@
   // a, b: { bpm, beatPhase, key, rootKey?, energy?, energyHop?, offset, dur, start }
   //   zaman alanları kaynak (şarkı) saniyesidir; start zaman çizelgesindeki konumdur.
   // H: { semitonesToMatch(key, refKey) } (analysis.js)
-  function suggestTransitions(a, b, H, { max = 3 } = {}) {
+  function suggestTransitions(a, b, H, { max = 3, crossfadeBeats = CROSSFADE_BEATS } = {}) {
     const pA = 60 / a.bpm;
     const pB = 60 / b.bpm;
 
@@ -57,7 +57,7 @@
 
     const aEnd = a.offset + a.dur;
     const bEnd = b.offset + b.dur;
-    const crossfade0 = CROSSFADE_BEATS * pA;
+    const crossfade0 = crossfadeBeats * pA;
     const refB = medianEnergy(b.energy);
 
     // B giriş noktaları (B'nin kaynak saniyesi): çalan kısmın ilk vuruşu ve en güçlü "drop".
@@ -110,6 +110,9 @@
         const lead = entry.kind === 'drop' ? Math.min(crossfade, (entry.t - b.offset) / rate) : 0;
         const bStart = tlA - (entry.kind === 'drop' ? lead : (entry.t - b.offset) / rate);
         if (bStart < -1e-6) continue;
+        // drop girişinde crossfade, B'nin drop'tan önceki malzemesiyle sınırlıdır.
+        const fade = entry.kind === 'drop' ? lead : crossfade;
+        if (fade < MIN_FADE_BEATS * pA) continue;
 
         const window = crossfade * rate;                 // B'nin kaynak saniyesi cinsinden pencere
         let enterScore = 0.5;
@@ -133,7 +136,7 @@
 
         found.push({
           aPoint: t, tlA, bPoint: entry.t, bStart, lead, entryKind: entry.kind,
-          crossfade, beats: crossfade / pA, targetBpm, tempoPct, semis,
+          crossfade: fade, truncated: fade < crossfade0 - 1e-6, beats: fade / pA, targetBpm, tempoPct, semis,
           score: Math.round(total * 100),
           parts: { tempo: tempoScore, key: keyScore, out: outScore, enter: enterScore, place: placeScore },
           reasons,
@@ -142,6 +145,8 @@
     }
 
     // En yüksek puanlılar; birbirine çok yakın (aynı girişli) olanlardan yalnızca en iyisi.
+    // İstenen uzunlukta bir geçiş mümkünse A'nın sonunda kısalan (kırpılmış) geçişler elenir.
+    if (found.some((c) => !c.truncated)) found.splice(0, found.length, ...found.filter((c) => !c.truncated));
     found.sort((x, y) => y.score - x.score || x.tlA - y.tlA);
     const picked = [];
     for (const c of found) {

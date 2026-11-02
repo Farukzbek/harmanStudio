@@ -131,6 +131,8 @@
             <output id="ins-pan-val"></output>
             <input id="ins-pan" class="bipolar" type="range" min="-100" max="100" value="0" data-default="0">
           </div>
+          <p id="ins-multi" class="hint" hidden></p>
+          <button id="ins-level" class="btn solid wide" hidden title="Seçili parçaların ses yüksekliğini birbirine yaklaştırır">Seçilenlerin seviyesini eşitle</button>
         </section>
 
         <section id="ins-tempo">
@@ -179,6 +181,15 @@
               <button id="match-reset" class="btn solid wide" hidden>Orijinal tempo ve tona dön</button>
 
               <div class="trans">
+                <div class="seg-row">
+                  <span>Geçiş</span>
+                  <span id="trans-beats" class="seg" role="group" aria-label="Geçiş uzunluğu (vuruş)">
+                    <button data-beats="8" aria-pressed="false">8</button>
+                    <button data-beats="16" aria-pressed="true">16</button>
+                    <button data-beats="32" aria-pressed="false">32</button>
+                  </span>
+                  <span class="dim">vuruş</span>
+                </div>
                 <button id="trans-find" class="btn solid wide" title="Referans parçadan bu parçaya en iyi geçişi önerir">Geçiş öner</button>
                 <div id="trans-list" class="trans-list"></div>
               </div>

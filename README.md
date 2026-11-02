@@ -21,7 +21,8 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Çalarken yakınlaştır (⌥ + kaydır, trackpad'de sıkıştır), sağa sola git, istediğin saniyeye tıkla veya yaz; Boşluk son tıklanan yerden oynatır. Sol üstteki sayaç büyükte saniyeyi (61.37), küçükte dakika:saniyeyi (1:01.37) gösterir
 
 **Ses ve karışım**
-- Parça başına ses seviyesi (dB) ve sol / sağ denge
+- Parça başına ses seviyesi (dB) ve sol / sağ denge. Birden çok parça seçiliyken seviye, denge ve fade hepsine birlikte uygulanır
+- Seviye eşitleme: seçili parçaların ses yüksekliğini birbirine yaklaştırır (iki şarkıdan biri diğerinden yüksek çıkmasın)
 - Vokal / enstrüman ayırma: vokal, davul, bas, diğer. Her ses parçasının seviyesi ve sol/sağ dengesi ayrı; "Sadece vokal" / "Vokalsiz" ön ayarları
 - Zamanlı geçişler (her ses parçası için ayrı): şarkının istediğin saniyeleri arasında seviyeyi bir yüzdeden başka bir yüzdeye (artan veya azalan) ve istersen yönü (sol/sağ) kademeli olarak götür. Ör. davul 54. saniyeden 75. saniyeye %12'den %86'ya yükselsin, sol kulaktan sağ kulağa geçsin
 - Sürgülerin yanındaki değere (ör. "Sağ 3", "%80") tıklamak varsayılana döndürür
@@ -29,7 +30,7 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 **Tempo ve ton**
 - Otomatik BPM, ton (Camelot koduyla) ve ilk vuruş analizi; klip başlığında "124 BPM · 8A" etiketi
 - Bir parçayı diğerinin tempoyuna ve tonuna getir (Rubber Band ile), vuruşları hizala
-- Akıllı geçiş önerileri: iki parça için en iyi 3 geçişi önerir ve tek tıkla uygular
+- Akıllı geçiş önerileri: iki parça için en iyi 3 geçişi önerir ve tek tıkla uygular. Geçiş uzunluğu 8 / 16 / 32 vuruş seçilebilir
 
 **Projeler ve güvenlik**
 - Projeyi kaydet / aç (`.harman`, ⌘S / ⌥⌘O): tüm parçalar, ayarlar, zamanlı geçişler, tempo/ton değişiklikleri ve ayrılmış sesler olduğu gibi geri gelir; açınca yeniden ayırmak veya işlemek gerekmez. Orijinal şarkılar kopyalanmaz, yolla bağlanır; taşınmışsa açılışta yeni konumu göstermeni ister
@@ -191,13 +192,11 @@ Ses, Web Audio ile arayüzde çalınır ve kaydedilir; ağır işler (ayırma, t
 - Tempo ve ton tespiti gerçek müzikle geniş ölçekte denenmedi; ton tespiti özellikle tahminidir.
 - Zamanlı geçişler form ile girilir; parçanın üstünde fareyle çekilen bir eğri yok.
 - Proje dosyaları taşınabilir ama orijinal şarkılara dosya yoluyla bağlıdır; başka bilgisayara taşırken şarkıları da götür.
-- Toplu seçimde yan panel birincil parçayı gösterir; seviye ve fade gibi ayarlar şimdilik yalnızca o parçaya uygulanır.
+- Toplu seçimde seviye, denge ve fade tüm seçili parçalara uygulanır; ses parçası (vokal, davul…) ayarları ve zamanlı geçişler yalnızca birincil parçaya.
 
 ## Fikirler
 
 - Zamanlı geçişleri parçanın üstünde fareyle çizme
-- Toplu seçimde seviye ve fade gibi ayarları tüm seçili parçalara birden uygulama
-- Geçiş önerilerinde değişken crossfade uzunluğu (8 / 16 / 32 vuruş)
 
 ## Lisans ve üçüncü parti notları
 

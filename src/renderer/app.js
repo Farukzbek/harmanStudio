@@ -74,7 +74,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), insMulti: $('ins-multi'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -688,6 +688,10 @@ function updateInspector() {
   el.insFadeInVal.textContent = `${clip.fadeIn.toFixed(1)} sn`;
   el.insFadeOutVal.textContent = `${clip.fadeOut.toFixed(1)} sn`;
   [el.insGain, el.insFadeIn, el.insFadeOut].forEach(paintSlider);
+  const many = state.selection.size > 1;
+  el.insMulti.hidden = !many;
+  el.insLevel.hidden = !many;
+  if (many) el.insMulti.textContent = `Seviye, denge ve fade ${state.selection.size} parçaya birlikte uygulanır.`;
   el.insReset.disabled = isPristine(clip);
   el.insReset.title = el.insReset.disabled ? 'Bu parçada sıfırlanacak bir değişiklik yok' : 'Bu parçadaki tüm değişiklikleri sıfırla';
   el.insPan.value = Math.round((clip.pan || 0) * 100);
@@ -1066,29 +1070,72 @@ function limitFades(clip, changed) {
   }
 }
 
+// Birden çok parça seçiliyken sürgüler hepsine aynı değeri uygular (tek geri alma adımı).
 wireSlider(el.insGain, (v) => {
-  const clip = selected(); if (!clip) return;
-  clip.gain = v / 100;
-  layoutClip(clip); updateInspector(); onEdited();
+  if (!selected()) return;
+  for (const clip of selectedClips()) { clip.gain = v / 100; layoutClip(clip); }
+  updateInspector(); onEdited();
 });
 wireSlider(el.insPan, (v) => {
-  const clip = selected(); if (!clip) return;
-  clip.pan = v / 100;
-  el.insPanVal.textContent = panText(clip.pan);
+  if (!selected()) return;
+  for (const clip of selectedClips()) clip.pan = v / 100;
+  el.insPanVal.textContent = panText(v / 100);
   livePan();
 });
 wireSlider(el.insFadeIn, (v) => {
-  const clip = selected(); if (!clip) return;
-  clip.fadeIn = v / 10;
-  limitFades(clip, 'fadeIn');
-  layoutClip(clip); updateInspector(); onEdited();
+  if (!selected()) return;
+  for (const clip of selectedClips()) { clip.fadeIn = v / 10; limitFades(clip, 'fadeIn'); layoutClip(clip); }
+  updateInspector(); onEdited();
 });
 wireSlider(el.insFadeOut, (v) => {
-  const clip = selected(); if (!clip) return;
-  clip.fadeOut = v / 10;
-  limitFades(clip, 'fadeOut');
-  layoutClip(clip); updateInspector(); onEdited();
+  if (!selected()) return;
+  for (const clip of selectedClips()) { clip.fadeOut = v / 10; limitFades(clip, 'fadeOut'); layoutClip(clip); }
+  updateInspector(); onEdited();
 });
+
+// Seviye eşitleme: her parçanın çaldığı bölümün RMS'i (ses parçaları varsa seviyeleriyle) ölçülür;
+// seçilenlerin ortanca yüksekliği hedef olur, her parçanın seviyesi buna göre ayarlanır.
+function clipRms(clip) {
+  const src = sourceOf(clip);
+  const parts = hasStems(clip) && Object.values(clip.stemGains).some((g) => g !== 1)
+    ? Object.entries(src.stems).map(([n, s]) => ({ buffer: s.buffer, g: stemGain(clip, n) }))
+    : [{ buffer: src.buffer, g: 1 }];
+  const i0 = Math.max(0, Math.floor(clip.offset * SAMPLE_RATE));
+  const i1 = Math.min(src.buffer.length, Math.floor((clip.offset + clip.dur) * SAMPLE_RATE));
+  const chans = parts.map((p) => [p.buffer.getChannelData(0), p.buffer.getChannelData(p.buffer.numberOfChannels > 1 ? 1 : 0), p.g]);
+  let sum = 0;
+  let n = 0;
+  for (let i = i0; i < i1; i += 3) {
+    let l = 0;
+    let r = 0;
+    for (const [cl, cr, g] of chans) { l += cl[i] * g; r += cr[i] * g; }
+    sum += l * l + r * r;
+    n += 2;
+  }
+  return n ? Math.sqrt(sum / n) : 0;
+}
+
+function equalizeLevels() {
+  const clips = selectedClips();
+  if (clips.length < 2) return toast('Seviyeyi eşitlemek için en az iki parça seç');
+  const measured = clips.map((c) => ({ c, rms: clipRms(c) })).filter((m) => m.rms > 1e-4);
+  if (measured.length < 2) return toast('Seçilen parçalar neredeyse sessiz');
+  const eff = measured.map((m) => m.rms * m.c.gain).sort((a, b) => a - b);
+  const target = eff[Math.floor((eff.length - 1) / 2)];
+  let capped = 0;
+  mutate(() => {
+    for (const { c, rms } of measured) {
+      const want = target / rms;
+      c.gain = Math.round(clamp(want, 0, 1.5) * 100) / 100;
+      if (want > 1.5) capped++;
+      layoutClip(c);
+    }
+  });
+  updateInspector();
+  onEdited();
+  toast(capped ? `Seviyeler eşitlendi, ${capped} parça en yüksek seviyede kaldı` : 'Seviyeler eşitlendi. ⌘Z ile geri alabilirsin');
+}
+el.insLevel.addEventListener('click', equalizeLevels);
 wireSlider(el.zoom, (v) => setZoom(ppsFromSlider(v)));
 
 // ---------------------------------------------------------- düzenleme işlemleri
@@ -1863,7 +1910,7 @@ async function startSeparate() {
 // Bir "kaynak" (state.sources) tek bir ses dosyasıdır. Tempo/ton değiştirilince orijinalden
 // yeni bir kaynak türetilir (origin: { srcId, rate, semis }); klip bu kaynağa geçer. Hep
 // orijinalden işlenir, böylece tekrar tekrar uygulamak sesi katman katman bozmaz.
-const tempo = { refId: null, forClip: null, doTempo: true, doKey: true, semis: 0, semisManual: false, optionsKey: '' };
+const tempo = { fadeBeats: 16, refId: null, forClip: null, doTempo: true, doKey: true, semis: 0, semisManual: false, optionsKey: '' };
 let analysisQueue = Promise.resolve();
 
 function queueAnalysis(srcId) {
@@ -2432,6 +2479,7 @@ function clipMenu(time, track) {
     { label: 'Başlangıcı çizgiye kırp', hint: 'Q', disabled: !(primary && t > primary.start + 0.001 && t < clipEnd(primary) - MIN_CLIP), run: () => trimToPlayhead('start') },
     { label: 'Bitişi çizgiye kırp', hint: 'W', disabled: !(primary && t > primary.start + MIN_CLIP && t < clipEnd(primary) - 0.001), run: () => trimToPlayhead('end') },
     'sep',
+    { label: 'Seçilenlerin seviyesini eşitle', disabled: !many, run: equalizeLevels },
     { label: 'Vokal / enstrüman ayır…', hint: '⇧⌘S', run: openSeparate },
     { label: 'Tempo ve tonu eşleştir…', hint: '⇧⌘M', run: showMatchPanel },
     { label: 'Geçiş önerileri…', run: () => { showMatchPanel(); findTransitions(); } },
@@ -2486,7 +2534,7 @@ function findTransitions() {
   const b = selected();
   const a = state.clips.find((c) => c.id === tempo.refId);
   if (!b || !a) return toast('Önce giren parçayı seç ve referans (çıkan) parçayı belirle');
-  const list = Transitions.suggestTransitions(describeForTransition(a), describeForTransition(b), Analysis);
+  const list = Transitions.suggestTransitions(describeForTransition(a), describeForTransition(b), Analysis, { crossfadeBeats: tempo.fadeBeats });
   renderTransitions(list, a, b);
 }
 
@@ -2609,6 +2657,13 @@ async function applyTransition(s, aId, bId, listen) {
 }
 
 el.transFind.addEventListener('click', findTransitions);
+el.transBeats.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-beats]');
+  if (!btn) return;
+  tempo.fadeBeats = Number(btn.dataset.beats);
+  el.transBeats.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+  if (el.transList.children.length) findTransitions();       // liste açıksa yeni uzunlukla yenile
+});
 
 // ------------------------------------------------------------------ eylemler
 async function pickAndAdd() {
