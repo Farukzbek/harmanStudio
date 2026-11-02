@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, screen } = require('electron');
 const { execFile } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -29,10 +29,26 @@ function tempFile(ext) {
   return path.join(os.tmpdir(), `harman-${process.pid}-${Date.now()}.${ext}`);
 }
 
+// Pencere boyutu ve konumu hatırlanır; ekran artık yoksa (harici monitör çıkarıldı) varsayılana dönülür.
+const boundsFile = () => path.join(app.getPath('userData'), 'window.json');
+function loadBounds() {
+  try {
+    const b = JSON.parse(fs.readFileSync(boundsFile(), 'utf8'));
+    if (![b.x, b.y, b.width, b.height].every(Number.isFinite)) return null;
+    const visible = screen.getAllDisplays().some((d) => {
+      const a = d.workArea;
+      return b.x + 80 < a.x + a.width && b.x + b.width - 80 > a.x && b.y >= a.y - 10 && b.y + 60 < a.y + a.height;
+    });
+    return visible ? b : null;
+  } catch { return null; }
+}
+
 function createWindow() {
+  const saved = loadBounds();
   const win = new BrowserWindow({
-    width: 1320,
-    height: 800,
+    width: saved?.width ?? 1320,
+    height: saved?.height ?? 800,
+    ...(saved ? { x: saved.x, y: saved.y } : {}),
     minWidth: 960,
     minHeight: 560,
     backgroundColor: '#121317',
@@ -45,6 +61,17 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  let boundsTimer = null;
+  const saveBounds = () => {
+    clearTimeout(boundsTimer);
+    boundsTimer = setTimeout(() => {
+      if (win.isDestroyed() || win.isFullScreen() || win.isMinimized()) return;
+      try { fs.writeFileSync(boundsFile(), JSON.stringify(win.getBounds())); } catch { /* yazılamazsa önemli değil */ }
+    }, 400);
+  };
+  win.on('resize', saveBounds);
+  win.on('move', saveBounds);
 
   // Kaydedilmemiş çalışma varsa pencere hemen kapanmaz: arayüz sorar (Kaydet / Kaydetme / Vazgeç).
   // Sayfa yüklenmediyse ya da çöktüyse kapatmayı engellemeyiz.
@@ -63,7 +90,7 @@ app.on('before-quit', () => { quitting = true; });
 // Menü; tıklamalar arayüze "menu" olayı olarak gider. registerAccelerator:false olanlar
 // yalnızca kısayolu göstermek içindir, tuşu arayüz kendisi dinler.
 function buildMenu() {
-  const send = (id) => () => BrowserWindow.getAllWindows()[0]?.webContents.send('menu', id);
+  const send = (id) => (menuItem) => BrowserWindow.getAllWindows()[0]?.webContents.send('menu', id, menuItem?.checked);
   const item = (label, id, accelerator, extra = {}) => ({ label, accelerator, click: send(id), ...extra });
   const display = { registerAccelerator: false };
   const sep = { type: 'separator' };
@@ -130,6 +157,7 @@ function buildMenu() {
         item('Yakınlaştır', 'zoom-in', 'CmdOrCtrl+='),
         item('Uzaklaştır', 'zoom-out', 'CmdOrCtrl+-'),
         item('Tümünü Sığdır', 'fit', 'CmdOrCtrl+0'),
+        item('Vuruşa Yapış', 'snap-beats', null, { type: 'checkbox', checked: true }),
         sep,
         { role: 'togglefullscreen', label: 'Tam Ekran' },
         ...(app.isPackaged ? [] : [sep, { role: 'toggleDevTools', label: 'Geliştirici Araçları' }]),

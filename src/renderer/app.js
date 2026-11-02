@@ -45,6 +45,7 @@ const state = {
   redo: [],
   pending: null,                // süren bir düzenlemenin başlangıç görüntüsü
   normalize: true,
+  snapBeats: true,              // kırpma ve bölmede vuruşa yapış (Görünüm menüsü)
   loop: null,                   // { from, to } saniye: çalarken bu aralık tekrarlanır
 };
 const keys = { ctrl: false };   // gerçek Ctrl tuşu (trackpad sıkıştırmasından ayırt etmek için)
@@ -192,6 +193,23 @@ function clipPeaks(clip) {
 const clipEnd = (c) => c.start + c.dur;
 const selected = () => state.clips.find((c) => c.id === state.selectedId) || null;
 const projectEnd = () => state.clips.reduce((m, c) => Math.max(m, clipEnd(c)), 0);
+// Teknik hata iletilerini anlaşılır Türkçeye çevirir; tanınmayanlar olduğu gibi kalır.
+function friendly(message) {
+  const m = String(message || '').replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  const rules = [
+    [/ENOENT|no such file/i, 'Dosya bulunamadı. Taşınmış ya da silinmiş olabilir.'],
+    [/ENOSPC|no space left/i, 'Diskte yeterli boş yer yok. Yer açıp tekrar dene.'],
+    [/EACCES|EPERM|permission denied/i, 'Dosyaya erişim izni yok. Konumu ya da izinleri kontrol et.'],
+    [/out of memory|MemoryError|Cannot allocate|kIOGPU|insufficient memory/i, 'Bellek yetmedi. Diğer uygulamaları kapatıp tekrar dene ya da daha hızlı bir model seç.'],
+    [/ENOTFOUND|ETIMEDOUT|ECONNRESET|EAI_AGAIN|getaddrinfo|network|Could not resolve/i, 'İnternet bağlantısı gerekiyor (ilk kurulumda indirme yapılır). Bağlantını kontrol edip tekrar dene.'],
+    [/Unable to decode audio data|EncodingError/i, 'Bu ses dosyası çözülemedi: bozuk ya da desteklenmeyen bir biçim olabilir. ffmpeg kuruluysa tekrar dene.'],
+    [/ffmpeg/i, m],
+  ];
+  const hit = rules.find(([re]) => re.test(m));
+  const text = hit ? hit[1] : m;
+  return hit && text !== m && m.length < 200 ? `${text} (${m})` : text;
+}
+
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 function formatTime(t, decimals = 1) {
@@ -309,7 +327,7 @@ async function addFiles(paths) {
     try {
       addClip(name, await decodeFile(path), path);
     } catch (err) {
-      toast(`"${name}" açılamadı: ${err.message}`, true);
+      toast(`"${name}" açılamadı: ${friendly(err.message)}`, true);
     }
   }
 }
@@ -1372,9 +1390,10 @@ function copyMixParams(clip) {
 
 // Seçili tüm klipleri oynatma çizgisinden böler (çizgi içinde kalanları).
 function splitSelected() {
-  const t = state.playhead;
   const chosen = selectedClips();
   if (!chosen.length) return toast('Önce bir parça seç');
+  // Kesim, ana parçanın en yakın vuruşuna oturur (Görünüm → Vuruşa Yapış kapalıysa tam çizginin olduğu yere).
+  const t = beatSnapTime(selected() || chosen[0], state.playhead);
   const targets = chosen.filter((c) => t >= c.start + MIN_CLIP && t <= clipEnd(c) - MIN_CLIP);
   if (!targets.length) return toast('Oynatma çizgisini seçili parçanın içine getir');
   mutate(() => {
@@ -1431,8 +1450,8 @@ function deleteSelected() {
 // edge: 'start' → başlangıcı, 'end' → bitişi oynatma çizgisine getir.
 function trimToPlayhead(edge) {
   const clip = selected();
-  const t = state.playhead;
   if (!clip) return toast('Önce bir parça seç');
+  const t = beatSnapTime(clip, state.playhead);
   const ok = edge === 'start'
     ? t > clip.start + 0.001 && t < clipEnd(clip) - MIN_CLIP
     : t > clip.start + MIN_CLIP && t < clipEnd(clip) - 0.001;
@@ -1531,9 +1550,27 @@ function beginDrag(e, clip) {
 }
 
 // Başka parçaların kenarlarına ve oynatma çizgisine yapışma (taşınan parçaların kendileri hariç).
-function snap(time, ignore, edges) {
+// Parçanın kendi vuruş ızgarasındaki en yakın vuruş (zaman çizelgesi saniyesi). gridShift: kaynak
+// saniyesini zaman çizelgesine çeviren sabit (start - offset). Analiz yoksa null.
+function nearestBeat(clip, time, gridShift = clip.start - clip.offset) {
+  const src = sourceOf(clip);
+  if (!state.snapBeats || src?.analysis !== 'done' || !(src.bpm > 0)) return null;
+  const period = 60 / src.bpm;
+  const k = Math.round((time - gridShift - src.beatPhase) / period);
+  return gridShift + src.beatPhase + k * period;
+}
+const beatSnapTime = (clip, time) => {
+  const b = nearestBeat(clip, time);
+  return b !== null && Math.abs(b - time) <= (SNAP_PX * 1.5) / state.pps ? b : time;
+};
+
+function snap(time, ignore, edges, beatOf = null) {
   const limit = SNAP_PX / state.pps;
   const targets = [0, state.playhead];
+  if (beatOf) {
+    const b = beatOf(time);
+    if (b !== null) targets.push(b);
+  }
   state.clips.forEach((c) => { if (!ignore.includes(c)) targets.push(c.start, clipEnd(c)); });
   let best = null;
   for (const edge of edges) {
@@ -1560,7 +1597,7 @@ function applyDrag() {
   if (Math.abs(drag.x - drag.startX) > 3 || Math.abs(drag.y - drag.startY) > 3) drag.moved = true;
   // Görünüm kaydıysa fare altındaki içerik de kaymıştır: kayma kadarını farka ekle.
   const dx = (drag.x - drag.startX + el.timeline.scrollLeft - drag.startScroll) / state.pps;
-  const snapTo = drag.snapOff ? (t) => t : (t, edges) => snap(t, group, edges);
+  const snapTo = drag.snapOff ? (t) => t : (t, edges) => snap(t, group, edges, mode === 'trimL' || mode === 'trimR' ? (x) => ((60 / (sourceOf(clip)?.bpm || 120)) * state.pps >= SNAP_PX * 2 ? nearestBeat(clip, x, orig.start - orig.offset) : null) : null);
 
   if (mode === 'move') {
     const groupStart = Math.min(...group.map((c) => origs.get(c).start));
@@ -1998,7 +2035,7 @@ async function exportMix() {
     const saved = await window.harman.saveMix(encodeWav(rendered), name, preset.format, preset.kbps);
     if (saved) toast(`Kaydedildi: ${saved}`);
   } catch (err) {
-    toast(`Kaydedilemedi: ${err.message}`, true);
+    toast(`Kaydedilemedi: ${friendly(err.message)}`, true);
   } finally {
     el.btnExport.disabled = false;
   }
@@ -2074,7 +2111,7 @@ async function openSeparate() {
   try {
     sep.status = await window.harman.engineStatus();
   } catch (err) {
-    return toast(`Motor durumu okunamadı: ${err.message}`, true);
+    return toast(`Motor durumu okunamadı: ${friendly(err.message)}`, true);
   }
   sep.srcId = clip.srcId;
   el.sepTitle.textContent = 'Vokal ve enstrüman ayır';
@@ -2198,7 +2235,7 @@ async function startSeparate() {
     closeSep();
     toast(`Ayrıldı: ${Object.keys(stems).map((n) => STEM_LABELS[n] || n).join(', ')}`);
   } catch (err) {
-    const msg = err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    const msg = friendly(err.message);
     if (msg.includes('İptal edildi')) {
       closeSep();
     } else {
@@ -2468,7 +2505,7 @@ async function runBusy(title, job) {
     closeSep();
     return true;
   } catch (err) {
-    const msg = err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    const msg = friendly(err.message);
     if (msg.includes('İptal edildi')) {
       closeSep();
     } else {
@@ -3237,7 +3274,7 @@ async function saveProject(saveAs = false) {
       await writeProjectFiles(file, dir);
     });
   } catch (err) {
-    toast(`Kaydedilemedi: ${err.message}`, true);
+    toast(`Kaydedilemedi: ${friendly(err.message)}`, true);
     return false;
   }
   project.path = file;
@@ -3431,7 +3468,7 @@ async function projectOpen() {
   const file = await window.harman.projectOpenDialog();
   if (!file) return;
   if (!(await confirmDiscard('açarken'))) return;
-  try { await openProjectFile(file); } catch (err) { toast(`Proje açılamadı: ${err.message}`, true); }
+  try { await openProjectFile(file); } catch (err) { toast(`Proje açılamadı: ${friendly(err.message)}`, true); }
 }
 
 async function projectNew() {
@@ -3487,7 +3524,7 @@ async function offerRestore() {
     });
     if (ok) toast('Yedek geri yüklendi. ⌘S ile kaydet');
   } catch (err) {
-    toast(`Yedek açılamadı: ${err.message}`, true);
+    toast(`Yedek açılamadı: ${friendly(err.message)}`, true);
   }
 }
 
@@ -3511,6 +3548,7 @@ const actions = {
   delete: deleteSelected,
   play: togglePlay,
   loop: toggleLoop,
+  'snap-beats': (value) => { state.snapBeats = value ?? !state.snapBeats; toast(state.snapBeats ? 'Vuruşa yapışma açık' : 'Vuruşa yapışma kapalı'); },
   automix,
   start: () => { goTo(0); el.timeline.scrollLeft = 0; },
   end: () => goTo(projectEnd()),
@@ -3599,12 +3637,12 @@ window.harman.onFilesDropped(async (paths) => {
   const proj = paths.find((p) => p.endsWith('.harman'));
   if (proj) {
     if (!(await confirmDiscard('açarken'))) return;
-    try { await openProjectFile(proj); } catch (err) { toast(`Proje açılamadı: ${err.message}`, true); }
+    try { await openProjectFile(proj); } catch (err) { toast(`Proje açılamadı: ${friendly(err.message)}`, true); }
     return;
   }
   addFiles(paths);
 });
-window.harman.onMenu((id) => {
+window.harman.onMenu((id, value) => {
   if (Tour.active && id !== 'welcome') return;        // rehber açıkken menü eylemleri bekler
   const field = document.activeElement;
   const typingInField = field && (field.tagName === 'TEXTAREA' || (field.tagName === 'INPUT' && field.type !== 'range'));
@@ -3613,7 +3651,7 @@ window.harman.onMenu((id) => {
   // Aynı şekilde kopyala/kes/yapıştır/tümünü seç yazı kutusundayken o kutuya uygulanır.
   const NATIVE = { copy: 'copy', cut: 'cut', paste: 'paste', selectall: 'selectAll' };
   if (typingInField && NATIVE[id]) { window.harman.nativeEdit(NATIVE[id]); return; }
-  actions[id]?.();
+  actions[id]?.(value);
 });
 
 window.addEventListener('resize', () => layoutAll());

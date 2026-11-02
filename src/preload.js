@@ -55,5 +55,5 @@ contextBridge.exposeInMainWorld('harman', {
   setTitle: (title) => ipcRenderer.invoke('set-title', title),
   onCloseRequest: (cb) => { ipcRenderer.on('close-request', () => cb()); },
   onFilesDropped: (cb) => { dropHandler = cb; },
-  onMenu: (cb) => { ipcRenderer.on('menu', (_e, id) => cb(id)); },
+  onMenu: (cb) => { ipcRenderer.on('menu', (_e, id, value) => cb(id, value)); },
 });

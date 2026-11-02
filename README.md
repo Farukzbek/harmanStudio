@@ -21,6 +21,8 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Fareyle dikdörtgen çizerek toplu seçim; seçili parçaları birlikte taşı, böl, çoğalt, sil. Sürüklerken görünümün kenarına gelince otomatik kayar
 - Her hattın sağ altında bir kutucuk: kapatırsan o hattaki parçalar çalmaz (kaydedilen mix'e de girmez)
 - Her parça bağımsızdır: bir şarkıdan kesilen, çoğaltılan veya yapıştırılan parçaların BPM/ton düzeltmesi, vokal ayırma sonucu, tempo/ton değişikliği, zamanlı geçişleri ve sıfırlaması kendilerine aittir. Ses verisi paylaşıldığı için bellek harcanmaz; aynı sesten ayrılmış parçalar varsa yeniden hesaplanmadan kullanılır
+- Vuruşa yapışma: bölme (**S**), başı/sonu çizgiye kırpma (**Q** / **W**) ve kenar sürükleyerek kırpma, parçanın en yakın vuruşuna oturur. Görünüm → Vuruşa Yapış ile kapatılır; sürüklerken ⌘ basılıysa da devre dışıdır
+- Pencere boyutu ve konumu hatırlanır
 - Döngüde dinleme (**L**): seçili parçayı ya da uyguladığın geçişi tekrar tekrar çal; geçiş uygularken "Uygula ve döngüde dinle" geçiş bölgesini döngüye alır
 - Yakınlaşınca dalga formunda vuruş çizgileri (her 4 vuruş belirgin) görünür; kesim ve geçişleri vuruşa oturtmak kolaylaşır
 - Çalarken yakınlaştır (⌥ + kaydır, trackpad'de sıkıştır), sağa sola git, istediğin saniyeye tıkla veya yaz; Boşluk son tıklanan yerden oynatır. Sol üstteki sayaç büyükte saniyeyi (61.37), küçükte dakika:saniyeyi (1:01.37) gösterir
