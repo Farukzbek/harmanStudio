@@ -19,7 +19,7 @@ const SNAP_PX = 8;
 const PPS_MIN = 0.5;            // yakınlık: saniye başına piksel
 const PPS_MAX = 240;
 const UNDO_LIMIT = 100;
-const PARAM_KEYS = ['id', 'srcId', 'name', 'track', 'start', 'offset', 'dur', 'fadeIn', 'fadeOut', 'gain', 'stemGains', 'pan', 'stemPans', 'stemRamps', 'eqLow', 'eqHigh', 'bassSwap', 'hue'];
+const PARAM_KEYS = ['id', 'srcId', 'name', 'track', 'start', 'offset', 'dur', 'fadeIn', 'fadeOut', 'gain', 'stemGains', 'pan', 'stemPans', 'stemRamps', 'eqLow', 'eqHigh', 'bassSwap', 'hue', 'mute', 'solo'];
 const STEM_ORDER = ['vocals', 'instrumental', 'drums', 'bass', 'guitar', 'piano', 'other'];
 const STEM_LABELS = {
   vocals: 'Vokal', instrumental: 'Enstrüman', drums: 'Davul', bass: 'Bas',
@@ -78,7 +78,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -195,6 +195,9 @@ function clipPeaks(clip) {
 const clipEnd = (c) => c.start + c.dur;
 // Parçanın rengi: elle seçilmediyse hattınki.
 const clipHue = (clip) => clip.hue ?? TRACK_HUES[clip.track];
+// Sessize alma ve solo (parça başına): solo varsa yalnızca solo'lu parçalar duyulur.
+const anySolo = () => state.clips.some((c) => c.solo);
+const isAudible = (clip) => !clip.mute && (!anySolo() || !!clip.solo);
 const selected = () => state.clips.find((c) => c.id === state.selectedId) || null;
 const projectEnd = () => state.clips.reduce((m, c) => Math.max(m, clipEnd(c)), 0);
 // Teknik hata iletilerini anlaşılır Türkçeye çevirir; tanınmayanlar olduğu gibi kalır.
@@ -412,7 +415,7 @@ function createClipElement(clip) {
   const node = document.createElement('div');
   node.className = 'clip';
   node.innerHTML = `
-    <div class="clip-head"><span class="clip-title"></span><span class="clip-tag"></span></div>
+    <div class="clip-head"><span class="clip-title"></span><span class="clip-flag"></span><span class="clip-tag"></span></div>
     <canvas class="clip-wave"></canvas>
     <div class="edge l" data-mode="trimL"></div>
     <div class="edge r" data-mode="trimR"></div>
@@ -434,7 +437,9 @@ function positionClip(clip) {
   clip.el.style.width = `${w}px`;
   clip.el.style.setProperty('--hue', clipHue(clip));
   clip.el.classList.toggle('selected', state.selection.has(clip.id));
-  clip.el.classList.toggle('muted', !state.trackOn[clip.track]);
+  clip.el.classList.toggle('muted', !state.trackOn[clip.track] || !isAudible(clip));
+  clip.el.classList.toggle('soloed', !!clip.solo);
+  clip.el.querySelector('.clip-flag').textContent = clip.mute ? 'SESSİZ' : clip.solo ? 'SOLO' : '';
   clip.el.querySelector('.clip-tag').textContent = tagText(clip);
   clip.el.querySelector('.fi').style.left = `${clip.fadeIn * state.pps}px`;
   clip.el.querySelector('.fo').style.left = `${w - clip.fadeOut * state.pps}px`;
@@ -783,6 +788,7 @@ function updateStatus() {
   if (state.snapBeats) modes.push('Vuruşa yapış');
   if (state.loop) modes.push('Döngü');
   if (!state.trackOn.every(Boolean)) modes.push('Sessiz hat var');
+  if (anySolo()) modes.push('Solo açık');
   el.stModes.textContent = modes.join(' · ');
 }
 
@@ -810,6 +816,8 @@ function updateInspector() {
   el.insBassVal.textContent = dbText(clip.eqLow || 0);
   el.insTrebleVal.textContent = dbText(clip.eqHigh || 0);
   el.insSwap.setAttribute('aria-checked', String(!!clip.bassSwap));
+  el.insMute.setAttribute('aria-pressed', String(!!clip.mute));
+  el.insSolo.setAttribute('aria-pressed', String(!!clip.solo));
   [el.insBass, el.insTreble].forEach(paintSlider);
   const many = state.selection.size > 1;
   el.insMulti.hidden = !many;
@@ -1387,6 +1395,18 @@ el.transBass.addEventListener('click', () => {
   el.transBass.setAttribute('aria-checked', String(tempo.bassSwap));
 });
 
+// Sessize al / solo: seçili tüm parçalara uygulanır; çalıyorsa ses hemen güncellenir.
+function toggleClipFlag(flag) {
+  const chosen = selectedClips();
+  if (!chosen.length) return toast('Önce bir parça seç');
+  const on = !chosen.every((c) => c[flag]);
+  mutate(() => { for (const c of chosen) c[flag] = on || undefined; });
+  layoutAll();
+  onEdited();
+}
+el.insMute.addEventListener('click', () => toggleClipFlag('mute'));
+el.insSolo.addEventListener('click', () => toggleClipFlag('solo'));
+
 // Parça rengi: seçili tüm parçalara uygulanır. "Hat rengi" (kesikli) elle seçimi kaldırır.
 for (const hue of [...CLIP_HUES, 'auto']) {
   const b = document.createElement('button');
@@ -1903,7 +1923,7 @@ function scheduleMix(audioCtx, from, base, destination, { keepSilent = false } =
   });
 
   for (const clip of state.clips) {
-    if (!keepSilent && !state.trackOn[clip.track]) continue;
+    if (!keepSilent && (!state.trackOn[clip.track] || !isAudible(clip))) continue;
     const end = clipEnd(clip);
     if (end <= from) continue;
     const startTl = Math.max(clip.start, from);
@@ -1933,7 +1953,9 @@ function scheduleMix(audioCtx, from, base, destination, { keepSilent = false } =
     } else {
       envelope.connect(clipPan);
     }
-    clipPan.connect(trackNodes[clip.track]);
+    const gate = audioCtx.createGain();               // sessize alma / solo: çalarken yeniden kurulumla güncellenir
+    gate.gain.value = isAudible(clip) ? 1 : 0;
+    clipPan.connect(gate).connect(trackNodes[clip.track]);
     clipNodes.push({ clipId: clip.id, pan: clipPan });
 
     const list = hasStems(clip)
@@ -2788,7 +2810,7 @@ function copySelected() {
   if (!chosen.length) return toast('Önce bir parça seç');
   state.clipboard = chosen.map((c) => ({
     srcId: c.srcId, name: c.name, track: c.track, start: c.start, offset: c.offset, dur: c.dur,
-    fadeIn: c.fadeIn, fadeOut: c.fadeOut, gain: c.gain, pan: c.pan, hue: c.hue, eqLow: c.eqLow, eqHigh: c.eqHigh, bassSwap: c.bassSwap, ...copyMixParams(c),
+    fadeIn: c.fadeIn, fadeOut: c.fadeOut, gain: c.gain, pan: c.pan, hue: c.hue, mute: c.mute, solo: c.solo, eqLow: c.eqLow, eqHigh: c.eqHigh, bassSwap: c.bassSwap, ...copyMixParams(c),
   }));
   toast(chosen.length > 1 ? `${chosen.length} parça kopyalandı` : 'Parça kopyalandı');
 }
@@ -2929,6 +2951,8 @@ function clipMenu(time, track) {
     { label: 'Şarkıları otomatik sırala ve karıştır…', run: automix },
     { label: 'Parçayı sıfırla…', disabled: !primary || isPristine(primary), run: () => el.insReset.click() },
     'sep',
+    { label: selectedClips().every((c) => c.mute) ? 'Sesi aç' : 'Sessize al', hint: '⌥M', run: () => toggleClipFlag('mute') },
+    { label: selectedClips().every((c) => c.solo) ? 'Solo\'yu kapat' : 'Solo', hint: '⌥S', run: () => toggleClipFlag('solo') },
     { label: 'Yeniden adlandır…', hint: 'F2', disabled: !primary, run: () => beginRename(primary) },
     'sep',
     { label: many ? 'Seçilenleri sil' : 'Sil', hint: '⌫', danger: true, run: deleteSelected },
@@ -4055,6 +4079,11 @@ document.addEventListener('keydown', (e) => {
   if (e.altKey && !e.metaKey && !e.ctrlKey && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
     e.preventDefault();
     moveSelectionTrack(e.code === 'ArrowUp' ? -1 : 1);
+    return;
+  }
+  if (e.altKey && !e.metaKey && !e.ctrlKey && (e.code === 'KeyM' || e.code === 'KeyS')) {
+    e.preventDefault();
+    toggleClipFlag(e.code === 'KeyM' ? 'mute' : 'solo');
     return;
   }
   // ⌘ + ← / →: ince adım. ⌥ + ← / →: parça kenarlarına atla. (Normal ok tuşları: 1 sn, ⇧ ile 5 sn.)

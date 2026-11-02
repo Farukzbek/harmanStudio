@@ -886,3 +886,11 @@ input[type="range"]:disabled { opacity: 0.45; }
 .swatch.auto[aria-pressed="true"] { border: 2px solid #fff; }
 .clip-rename { width: 70%; min-width: 60px; height: 15px; margin: 0; padding: 0 4px; font: inherit; color: #fff; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 3px; outline: none; user-select: text; }
 .marker-rename { position: absolute; bottom: 2px; width: 120px; height: 15px; padding: 0 5px; font: 500 10px var(--sans, inherit); color: #0f2a1d; background: #8ff0c0; border: 1px solid #fff; border-radius: 3px; outline: none; user-select: text; z-index: 7; }
+
+/* sessize alma / solo */
+.ms-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.ms-row .btn { flex: 1; justify-content: center; }
+.ms-row .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.clip-flag { margin-left: auto; margin-right: 6px; font: 600 8.5px var(--mono); letter-spacing: 0.4px; color: #fff; }
+.clip-flag:empty { display: none; }
+.clip.soloed { box-shadow: 0 0 0 1.5px #ffd166; }
