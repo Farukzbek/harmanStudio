@@ -4,7 +4,7 @@
 // kutusu bir adımdan ötekine yumuşakça kayar. Arayüze bağımlılığı yoktur; adımları çağıran verir.
 //
 // Tour.start(steps, { onEnd(reason) })   reason: 'done' | 'skip'
-//   step: { targets: ['#id', ...], title, html, pad? }  (targets boşsa tüm ekran kararır, kutu ortada durur)
+//   step: { targets: ['#id', ...], title, html, pad?, onEnter?, onLeave? }  (targets boşsa tüm ekran kararır, kutu ortada durur)
 (function (root) {
   const MARGIN = 14;
   const GAP = 14;
@@ -109,6 +109,11 @@
 
   function show(i, { instant = false } = {}) {
     const step = state.steps[i];
+    if (state.i !== i || !state.entered) {
+      state.steps[state.i]?.onLeave?.();
+      step.onEnter?.();
+      state.entered = true;
+    }
     state.i = i;
     const rect = targetRect(step);
     placeSpot(rect);                                  // vurgu hemen kaymaya başlar
@@ -134,6 +139,7 @@
   function end(reason) {
     if (!state) return;
     const { onEnd } = state;
+    state.steps[state.i]?.onLeave?.();
     clearTimeout(state.swapTimer);
     removeEventListener('keydown', onKey, true);
     removeEventListener('resize', onResize);
@@ -164,7 +170,7 @@
   function start(steps, { onEnd } = {}) {
     if (state) return;
     ui = build();
-    state = { steps, i: 0, onEnd, swapTimer: null };
+    state = { steps, i: 0, onEnd, swapTimer: null, entered: false };
     ui.skip.addEventListener('click', () => end('skip'));
     ui.back.addEventListener('click', () => go(-1));
     ui.next.addEventListener('click', () => go(1));

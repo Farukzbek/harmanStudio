@@ -899,3 +899,14 @@ input[type="range"]:disabled { opacity: 0.45; }
 .tpl-row select { flex: 1; min-width: 0; height: 26px; padding: 0 4px 0 6px; }
 .tpl-form { display: flex; gap: 6px; margin: -2px 0 8px; }
 .tpl-form input { flex: 1; min-width: 0; height: 26px; }
+
+/* rehberde parça ayarları önizlemesi: yalnızca rehber o adımdayken ve parça seçili değilken görünür */
+.ins-demo { display: none; margin-top: 14px; text-align: left; pointer-events: none; }
+.tour-demo-inspector .ins-demo { display: block; }
+.ins-demo h4 { margin: 12px 0 6px; font-size: 10px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-faint); }
+.demo-field { display: grid; grid-template-columns: 1fr auto; row-gap: 4px; margin-bottom: 8px; color: var(--text-dim); }
+.demo-field em { font: 500 11px var(--mono); font-style: normal; color: var(--text); }
+.demo-bar { grid-column: 1 / -1; position: relative; height: 4px; border-radius: 2px; background: #2a2e37; }
+.demo-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--accent); opacity: 0.7; }
+.demo-bar i.w30 { width: 30%; } .demo-bar i.w50 { width: 50%; } .demo-bar i.w70 { width: 70%; } .demo-bar i.w100 { width: 100%; }
+.demo-btn { margin: 4px 0 6px; padding: 6px 0; text-align: center; border-radius: 7px; background: #20232a; border: 1px solid var(--line); color: var(--text); }
