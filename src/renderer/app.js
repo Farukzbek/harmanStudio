@@ -78,7 +78,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), libFind: $('lib-find'), libList: $('lib-list'), libHint: $('lib-hint'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), meterBar: $('st-meter-bar'), peakText: $('st-peak'), meter: $('st-meter'), libFind: $('lib-find'), libList: $('lib-list'), libHint: $('lib-hint'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -2052,8 +2052,17 @@ function play() {
   if (state.playhead >= projectEnd()) state.playhead = 0;
   ctx.resume();
   const base = ctx.currentTime + 0.05;
-  const { sources, parts, clipNodes, trackNodes } = scheduleMix(ctx, state.playhead, base, ctx.destination, { keepSilent: true });
-  state.playing = { sources, parts, clipNodes, trackNodes, startPlayhead: state.playhead, base };
+  // Ana çıkış: seviye göstergesi için iki kanalın ayrı analizörü.
+  const master = ctx.createGain();
+  const split = ctx.createChannelSplitter(2);
+  const analysers = [ctx.createAnalyser(), ctx.createAnalyser()];
+  analysers.forEach((a) => { a.fftSize = 1024; });
+  master.connect(ctx.destination);
+  master.connect(split);
+  split.connect(analysers[0], 0);
+  split.connect(analysers[1], 1);
+  const { sources, parts, clipNodes, trackNodes } = scheduleMix(ctx, state.playhead, base, master, { keepSilent: true });
+  state.playing = { sources, parts, clipNodes, trackNodes, startPlayhead: state.playhead, base, master, analysers };
   setPlayUI(true);
   requestAnimationFrame(tick);
 }
@@ -2061,8 +2070,10 @@ function play() {
 function pause() {
   if (!state.playing) return;
   state.playing.sources.forEach((s) => { try { s.stop(); } catch { /* zaten durmuş */ } });
+  try { state.playing.master.disconnect(); } catch { /* zaten ayrılmış */ }
   state.playing = null;
   setPlayUI(false);
+  updateMeter(0, { reset: true });
 }
 
 let scrubbing = false;   // oynatma çizgisi fareyle sürükleniyor
@@ -2118,11 +2129,42 @@ function onEdited() {
   if (state.playing) seek(state.playhead);
 }
 
+// Çıkış seviyesi: iki kanalın tepe değeri, dB ölçeğinde (−48 … 0). 0 dB üstü "tepe" olarak işaretlenir.
+const meterState = { level: 0, hold: 0, holdUntil: 0, over: false };
+function updateMeter(peak, { reset = false } = {}) {
+  const now = performance.now();
+  if (reset) { meterState.level = 0; meterState.hold = 0; }
+  meterState.level = Math.max(peak, meterState.level * 0.9);
+  // Tepe tutma: son 1,5 saniyenin en yüksek değeri gösterilir (kick gibi kısa tepeler kaçmasın).
+  if (peak >= meterState.hold || now > meterState.holdUntil) { meterState.hold = peak; meterState.holdUntil = now + 1500; }
+  if (peak >= 0.999) meterState.over = true;
+  const toDb = (v) => (v > 0.0005 ? 20 * Math.log10(v) : -Infinity);
+  const db = toDb(meterState.level);
+  const holdDb = toDb(meterState.hold);
+  const frac = Number.isFinite(db) ? clamp((db + 48) / 48, 0, 1) : 0;
+  el.meterBar.style.setProperty('width', `${Math.round(frac * 100)}%`);
+  el.meterBar.classList.toggle('hot', holdDb > -6 && holdDb <= -0.5);
+  el.meterBar.classList.toggle('clip', holdDb > -0.5);
+  el.peakText.textContent = meterState.over ? 'TEPE' : Number.isFinite(holdDb) ? `${holdDb.toFixed(1)} dB` : '—';
+  el.peakText.classList.toggle('over', meterState.over);
+}
+el.meter.addEventListener('click', () => { meterState.over = false; updateMeter(0, { reset: true }); });
+const meterBuf = new Float32Array(1024);
+function readPeak(p) {
+  let peak = 0;
+  for (const a of p.analysers) {
+    a.getFloatTimeDomainData(meterBuf);
+    for (let i = 0; i < meterBuf.length; i++) { const v = Math.abs(meterBuf[i]); if (v > peak) peak = v; }
+  }
+  return peak;
+}
+
 function tick() {
   const p = state.playing;
   if (!p) return;
   if (scrubbing) { requestAnimationFrame(tick); return; }
   state.playhead = p.startPlayhead + Math.max(0, ctx.currentTime - p.base);
+  updateMeter(readPeak(p));
   if (state.loop && state.playhead >= state.loop.to) {
     seek(state.loop.from);
     return;
