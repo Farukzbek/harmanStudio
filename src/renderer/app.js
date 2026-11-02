@@ -75,7 +75,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), exportPreset: $('export-preset'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -1709,6 +1709,22 @@ function encodeWav(buffer) {
   return out;
 }
 
+// Çıktı ayarları: biçim, MP3 kalitesi ve normalize birlikte seçilir.
+const EXPORT_PRESETS = {
+  car: { format: 'mp3', kbps: 320, normalize: true },        // araba / hoparlör: en yüksek MP3 kalitesi
+  phone: { format: 'mp3', kbps: 192, normalize: true },      // telefon, paylaşım: küçük dosya
+  lossless: { format: 'wav', kbps: 0, normalize: false },    // arşiv, başka bir programda işlemek için
+};
+function applyExportPreset(key, { remember = true } = {}) {
+  const preset = EXPORT_PRESETS[key] || EXPORT_PRESETS.car;
+  el.exportPreset.value = EXPORT_PRESETS[key] ? key : 'car';
+  state.normalize = preset.normalize;
+  el.normalize.setAttribute('aria-checked', String(state.normalize));
+  if (remember) { try { localStorage.setItem('harman.exportPreset', el.exportPreset.value); } catch { /* özel pencere */ } }
+}
+el.exportPreset.addEventListener('change', () => { applyExportPreset(el.exportPreset.value); markDirty(); });
+try { applyExportPreset(localStorage.getItem('harman.exportPreset') || 'car', { remember: false }); } catch { applyExportPreset('car', { remember: false }); }
+
 async function exportMix() {
   if (!state.clips.length) return toast('Önce bir şarkı ekle');
   pause();
@@ -1735,7 +1751,8 @@ async function exportMix() {
     }
 
     const name = `${state.clips[0].name} mix`;
-    const saved = await window.harman.saveMix(encodeWav(rendered), name);
+    const preset = EXPORT_PRESETS[el.exportPreset.value];
+    const saved = await window.harman.saveMix(encodeWav(rendered), name, preset.format, preset.kbps);
     if (saved) toast(`Kaydedildi: ${saved}`);
   } catch (err) {
     toast(`Kaydedilemedi: ${err.message}`, true);

@@ -50,4 +50,6 @@ test('Kaydetme biçimi uzantıdan anlaşılır', () => {
   assert.deepStrictEqual(resolveSaveTarget('/x/mix.wav'), { filePath: '/x/mix.wav', format: 'wav' });
   assert.deepStrictEqual(resolveSaveTarget('/x/mix.MP3'), { filePath: '/x/mix.MP3', format: 'mp3' });
   assert.deepStrictEqual(resolveSaveTarget('/x/mix'), { filePath: '/x/mix.mp3', format: 'mp3' });
+  assert.deepStrictEqual(resolveSaveTarget('/x/mix', 'wav'), { filePath: '/x/mix.wav', format: 'wav' });
+  assert.deepStrictEqual(resolveSaveTarget('/x/mix.mp3', 'wav'), { filePath: '/x/mix.mp3', format: 'mp3' });
 });

@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('harman', {
   pickFiles: () => ipcRenderer.invoke('pick-files'),
   readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
   convertToWav: (filePath) => ipcRenderer.invoke('convert-to-wav', filePath),
-  saveMix: (wav, defaultName) => ipcRenderer.invoke('save-mix', { wav, defaultName }),
+  saveMix: (wav, defaultName, format, kbps) => ipcRenderer.invoke('save-mix', { wav, defaultName, format, kbps }),
   engineStatus: () => ipcRenderer.invoke('engine-status'),
   installEngine: () => ipcRenderer.invoke('engine-install'),
   onEngineProgress: (cb) => { ipcRenderer.on('engine-progress', (_e, p) => cb(p)); },

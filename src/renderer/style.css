@@ -50,6 +50,8 @@ html, body {
 }
 .topbar > *, .topbar button, .topbar input, .topbar label { -webkit-app-region: no-drag; }
 .topbar .spacer { flex: 1; -webkit-app-region: drag; align-self: stretch; }
+.preset-select { max-width: 138px; text-overflow: ellipsis; height: 28px; padding: 0 22px 0 8px; border-radius: 7px; border: 1px solid var(--line); background: #14161a; color: var(--text); font: 500 12px var(--sans, inherit); cursor: pointer; }
+.preset-select:hover { border-color: #3a3f4a; }
 .brand { display: flex; align-items: center; gap: 8px; margin-right: 6px; -webkit-app-region: drag; }
 .brand-name { font-weight: 600; font-size: 13px; letter-spacing: 0.2px; }
 .project-name { font-size: 12px; color: var(--text-faint); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 8px; border-left: 1px solid var(--line); }

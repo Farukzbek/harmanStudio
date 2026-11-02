@@ -179,18 +179,17 @@ ipcMain.handle('convert-to-wav', async (_e, filePath) => {
 // uzantıdan anlaşılır. Uzantı yoksa MP3.
 const { resolveSaveTarget } = require('./saveformat');
 
-ipcMain.handle('save-mix', async (_e, { wav, defaultName }) => {
+ipcMain.handle('save-mix', async (_e, { wav, defaultName, format: preferred = 'mp3', kbps = 320 }) => {
+  const mp3Filter = { name: `MP3 (${kbps || 320} kbps)`, extensions: ['mp3'] };
+  const wavFilter = { name: 'WAV (kayıpsız)', extensions: ['wav'] };
   const { canceled, filePath: chosen } = await dialog.showSaveDialog({
     title: 'Mix\'i kaydet',
-    defaultPath: path.join(app.getPath('music'), `${defaultName}.mp3`),
-    filters: [
-      { name: 'MP3 (küçük dosya, arabada dinlemek için)', extensions: ['mp3'] },
-      { name: 'WAV (kayıpsız)', extensions: ['wav'] },
-    ],
+    defaultPath: path.join(app.getPath('music'), `${defaultName}.${preferred === 'wav' ? 'wav' : 'mp3'}`),
+    filters: preferred === 'wav' ? [wavFilter, mp3Filter] : [mp3Filter, wavFilter],
   });
   if (canceled || !chosen) return null;
 
-  const { filePath, format } = resolveSaveTarget(chosen);
+  const { filePath, format } = resolveSaveTarget(chosen, preferred);
   const data = Buffer.from(wav);
   if (format === 'wav') {
     await fs.promises.writeFile(filePath, data);
@@ -199,7 +198,7 @@ ipcMain.handle('save-mix', async (_e, { wav, defaultName }) => {
   const tmp = tempFile('wav');
   try {
     await fs.promises.writeFile(tmp, data);
-    await runFfmpeg(['-i', tmp, '-codec:a', 'libmp3lame', '-b:a', '320k', filePath]);
+    await runFfmpeg(['-i', tmp, '-codec:a', 'libmp3lame', '-b:a', `${kbps || 320}k`, filePath]);
   } finally {
     fs.promises.rm(tmp, { force: true });
   }
