@@ -1,7 +1,7 @@
 {
   "name": "harman",
   "productName": "Harman",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Basit, ücretsiz ve açık kaynaklı müzik karıştırma aracı",
   "main": "src/main.js",
   "license": "MIT",

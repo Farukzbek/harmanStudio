@@ -21,6 +21,7 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Fareyle dikdörtgen çizerek toplu seçim; seçili parçaları birlikte taşı, böl, çoğalt, sil. Sürüklerken görünümün kenarına gelince otomatik kayar
 - Her hattın sağ altında bir kutucuk: kapatırsan o hattaki parçalar çalmaz (kaydedilen mix'e de girmez)
 - Her parça bağımsızdır: bir şarkıdan kesilen, çoğaltılan veya yapıştırılan parçaların BPM/ton düzeltmesi, vokal ayırma sonucu, tempo/ton değişikliği, zamanlı geçişleri ve sıfırlaması kendilerine aittir. Ses verisi paylaşıldığı için bellek harcanmaz; aynı sesten ayrılmış parçalar varsa yeniden hesaplanmadan kullanılır
+- Parça bazında **sessize alma** (⌥M) ve **solo** (⌥S): yan panelde, sağ tık menüsünde ya da tuşla; solo açıkken yalnızca solo'lu parçalar duyulur
 - İşaretçiler (**M**): oynatma çizgisine isimli nokta koy ("nakarat", "drop"). Cetvelde tıkla: git, sürükle: taşı, çift tıkla: adlandır, sağ tık: sil. ⌥ + ← / → işaretçilere de atlar. Projeyle saklanır, geri alınabilir
 - Parçayı yeniden adlandır (başlığa çift tıkla ya da **F2**) ve parçaya kendi rengini ver (yan panel)
 - Alt çubuk: parça sayısı, mix süresi, seçili parçanın özeti (BPM, ton, süre) ve açık kipler
@@ -43,6 +44,8 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Otomatik BPM, ton (Camelot koduyla) ve ilk vuruş analizi; klip başlığında "124 BPM · 8A" etiketi
 - Bir parçayı diğerinin tempoyuna ve tonuna getir (Rubber Band ile), vuruşları hizala
 - **Şarkıları otomatik sırala ve karıştır** (Düzen menüsü): seçili parçaları (ya da hepsini) tempo ve tona göre en uygun sıraya dizer, her çift için en iyi geçişi uygular. Tek geri alma adımıdır
+- **Geçiş şablonları:** uzunluk, bas takası, tempo ve ton eşitleme ayarlarını hazır ya da kendi şablonlarınla tek tıkla uygula
+- **Uyumlu şarkılar:** Harman analiz ettiği her şarkıyı hatırlar (bu bilgisayarda, dosya yoluyla); bir parçayı seçip "Kütüphanede uyumlu şarkı bul"a basınca tempo ve tonca en yakın şarkıları önerir, tek tıkla projeye ekler
 - Akıllı geçiş önerileri: iki parça için en iyi 3 geçişi önerir ve tek tıkla uygular. Geçiş uzunluğu 8 / 16 / 32 vuruş seçilebilir
 
 **Başlangıç**
@@ -55,6 +58,8 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Kaydedilmemiş değişiklik varken pencereyi kapatırsan (ya da ⌘Q) Kaydet / Kaydetme / Vazgeç diye sorar
 
 **Çıktı**
+- **Mix'i parçalara bölerek kaydet** (Dosya menüsü): işaretçilerden ya da parçalar arasındaki geçişlerin ortasından her şarkıyı ayrı dosya yapar ("01 - şarkı adı"), MP3 ya da WAV
+- **Ses parçalarını ayrı kaydet:** vokal, davul, bas, diğer için mix'in tamamını (kesimler, geçişler, seviyeler dahil) yalnızca o ses parçasıyla ayrı dosyalara yazar
 - Çıktı biçimi kaydederken sorulur: **MP3** (320 kbps) ya da **WAV** (kayıpsız); son seçtiğin bir sonraki sefer varsayılan olur. Normalize üst çubuktaki düğmeden açılır/kapanır
 - İsteğe bağlı normalize: mix'in en yüksek ses tepesini −1 dB'e ayarlar
 
@@ -185,6 +190,7 @@ Uygulama içinde `⌘/` ile tam liste açılır.
 | ⌘ + ← / → | İnce adım: yakınlığa göre yaklaşık 8 piksel (⇧ ile 5 kat) |
 | ⌥ + ← / → | Önceki / sonraki parça kenarına atla |
 | M | Oynatma çizgisine işaretçi koy |
+| ⌥M / ⌥S | Seçili parçayı sessize al / solo |
 | F2 | Seçili parçayı yeniden adlandır |
 | ⌥ + ↑ / ↓ | Seçili parçayı bir hat yukarı / aşağı taşı |
 | L | Seçili parçayı döngüde dinle (tekrar L: kapat) |

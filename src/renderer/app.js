@@ -78,7 +78,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), libFind: $('lib-find'), libList: $('lib-list'), libHint: $('lib-hint'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -1407,6 +1407,48 @@ function toggleClipFlag(flag) {
 el.insMute.addEventListener('click', () => toggleClipFlag('mute'));
 el.insSolo.addEventListener('click', () => toggleClipFlag('solo'));
 
+// Uyumlu şarkılar: kütüphanedeki (daha önce analiz edilmiş) şarkıları seçili parçaya tempo ve tonca yakınlığa göre sıralar.
+async function findCompatible() {
+  const clip = selected();
+  const src = clip && sourceOf(clip);
+  if (!src || src.analysis !== 'done') return toast('Parçanın analizi bitince tekrar dene');
+  const inProject = new Set(state.sources.size ? [...state.sources.values()].map((s) => s.path).filter(Boolean) : []);
+  const all = await window.harman.libraryList();
+  const ranked = all
+    .filter((e) => !inProject.has(e.path) && e.bpm > 0 && e.key)
+    .map((e) => ({ e, cost: transitionCost(src, e) }))
+    .sort((a, b) => a.cost - b.cost)
+    .slice(0, 6);
+  el.libList.replaceChildren();
+  if (!ranked.length) {
+    el.libHint.textContent = all.length ? 'Kütüphanedeki diğer şarkıların hepsi zaten projede.' : 'Kütüphane henüz boş. Şarkı ekledikçe burada birikir ve uyumlu olanlar önerilir.';
+    return;
+  }
+  el.libHint.textContent = `Kütüphanede ${all.length} şarkı var; ${fmtBpm(src.bpm)} BPM · ${Analysis.camelot(src.key).code} ile en uyanlar:`;
+  for (const { e, cost } of ranked) {
+    const item = document.createElement('div');
+    item.className = 'lib-item';
+    const name = document.createElement('span');
+    name.className = 'lib-name';
+    name.textContent = e.name;
+    name.title = e.path;
+    const fit = document.createElement('span');
+    fit.className = `lib-fit${cost >= 9 ? ' far' : ''}`;
+    fit.textContent = cost < 4 ? 'Çok uyumlu' : cost < 9 ? 'Uyumlu' : 'Uzak';
+    name.append(fit);
+    const meta = document.createElement('span');
+    meta.className = 'lib-meta';
+    meta.textContent = `${fmtBpm(e.bpm)} BPM · ${Analysis.camelot(e.key).code}`;
+    const add = document.createElement('button');
+    add.className = 'btn solid mini';
+    add.textContent = 'Ekle';
+    add.addEventListener('click', () => { addFiles([e.path]); item.remove(); });
+    item.append(name, meta, add);
+    el.libList.appendChild(item);
+  }
+}
+el.libFind.addEventListener('click', findCompatible);
+
 // Parça rengi: seçili tüm parçalara uygulanır. "Hat rengi" (kesikli) elle seçimi kaldırır.
 for (const hue of [...CLIP_HUES, 'auto']) {
   const b = document.createElement('button');
@@ -2467,6 +2509,15 @@ function queueAnalysis(srcId) {
   analysisQueue = analysisQueue.then(() => analyzeSource(srcId));
 }
 
+// Analiz edilen asıl şarkılar (tempo/ton türevleri değil) kütüphaneye yazılır.
+function addToLibrary(src) {
+  if (!src.path || src.origin || !(src.bpm > 0) || !src.key) return;
+  window.harman.libraryUpsert({
+    path: src.path, name: src.path.split('/').pop().replace(/\.[^.]+$/, ''),
+    bpm: src.bpm, key: src.key, dur: src.buffer?.duration,
+  }).catch(() => {});
+}
+
 async function analyzeSource(srcId) {
   const src = state.sources.get(srcId);
   try {
@@ -2477,6 +2528,7 @@ async function analyzeSource(srcId) {
       bpm: r.bpm, beatPhase: r.beatPhase, key: { tonic: r.key.tonic, mode: r.key.mode },
       energy: r.energy, energyHop: r.energyHop, analysis: 'done',
     });
+    addToLibrary(src);
   } catch (err) {
     console.error('Analiz başarısız', err);
     src.analysis = 'failed';
@@ -3717,7 +3769,7 @@ async function loadProject(data, dir, { path = null, name = null, dirty = false 
     state.clips.push(clip);
     createClipElement(clip);
   }
-  for (const [id, src] of state.sources) if (src.analysis !== 'done') queueAnalysis(id);
+  for (const [id, src] of state.sources) { if (src.analysis !== 'done') queueAnalysis(id); else addToLibrary(src); }
 
   state.markers = (data.markers || []).map((m) => ({ id: state.nextId++, t: m.t, name: m.name }));
   const v = data.view || {};

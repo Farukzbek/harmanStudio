@@ -274,6 +274,24 @@ ipcMain.handle('save-mix', async (_e, { wav, defaultName, format: preferred = 'm
   return filePath;
 });
 
+// Parça kütüphanesi: analiz edilen şarkıların BPM / ton bilgisi (dosya yoluyla). Uyumlu şarkı önerisi için.
+const libraryFile = () => path.join(app.getPath('userData'), 'library.json');
+function readLibrary() {
+  try {
+    const data = JSON.parse(fs.readFileSync(libraryFile(), 'utf8'));
+    return data && typeof data === 'object' ? data : {};
+  } catch { return {}; }
+}
+ipcMain.handle('library-upsert', (_e, entry) => {
+  if (!entry || typeof entry.path !== 'string' || !(entry.bpm > 0)) return;
+  const lib = readLibrary();
+  lib[entry.path] = { path: entry.path, name: String(entry.name || path.basename(entry.path)), bpm: entry.bpm, key: entry.key, dur: entry.dur, at: Date.now() };
+  const keys = Object.keys(lib);
+  if (keys.length > 3000) for (const k of keys.sort((a, b) => lib[a].at - lib[b].at).slice(0, keys.length - 3000)) delete lib[k];
+  try { fs.writeFileSync(libraryFile(), JSON.stringify(lib)); } catch { /* yazılamazsa önemli değil */ }
+});
+ipcMain.handle('library-list', () => Object.values(readLibrary()).filter((e) => fs.existsSync(e.path)));
+
 // Birden çok dosyayı bir klasöre yazar (bölünmüş mix, ayrı ses parçaları). Klasörü kullanıcı seçer.
 const safeName = (name) => String(name).replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Dosya';
 ipcMain.handle('save-batch', async (e, { files, format, kbps, title }) => {

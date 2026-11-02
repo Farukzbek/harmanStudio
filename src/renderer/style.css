@@ -910,3 +910,12 @@ input[type="range"]:disabled { opacity: 0.45; }
 .demo-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--accent); opacity: 0.7; }
 .demo-bar i.w30 { width: 30%; } .demo-bar i.w50 { width: 50%; } .demo-bar i.w70 { width: 70%; } .demo-bar i.w100 { width: 100%; }
 .demo-btn { margin: 4px 0 6px; padding: 6px 0; text-align: center; border-radius: 7px; background: #20232a; border: 1px solid var(--line); color: var(--text); }
+
+/* uyumlu şarkılar (kütüphane) */
+.lib-list { display: grid; gap: 6px; margin-top: 8px; }
+.lib-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 7px 9px; border-radius: 8px; background: #14161a; border: 1px solid var(--line-soft); }
+.lib-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.lib-meta { grid-column: 1; color: var(--text-faint); font: 500 10.5px var(--mono); }
+.lib-item .btn { grid-column: 2; grid-row: 1 / span 2; }
+.lib-fit { margin-left: 6px; padding: 1px 6px; border-radius: 5px; font: 600 9.5px var(--sans, inherit); background: var(--accent-soft); color: var(--accent); }
+.lib-fit.far { background: #2a2e37; color: var(--text-dim); }
