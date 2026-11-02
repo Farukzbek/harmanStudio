@@ -110,6 +110,7 @@ function buildMenu() {
         item('Çoğalt', 'duplicate', 'CmdOrCtrl+D'),
         item('Vokal / Enstrüman Ayır…', 'separate', 'Shift+CmdOrCtrl+S'),
         item('Tempo ve Tonu Eşleştir…', 'match', 'Shift+CmdOrCtrl+M'),
+        item('Şarkıları Otomatik Sırala ve Karıştır…', 'automix', null),
         item('Şarkıyı Sıfırla…', 'reset', null),
         item('Sil', 'delete', 'Backspace', display),
       ],
@@ -296,6 +297,12 @@ ipcMain.handle('confirm-unsaved', async (e, { name, action }) => {
     cancelId: 2,
   });
   return ['save', 'discard', 'cancel'][response];
+});
+ipcMain.handle('confirm-action', async (e, { message, detail, ok }) => {
+  const { response } = await dialog.showMessageBox(winOf(e), {
+    type: 'question', message, detail, buttons: [ok, 'Vazgeç'], defaultId: 0, cancelId: 1,
+  });
+  return response === 0;
 });
 ipcMain.handle('confirm-restore', async (e, info) => {
   const { response } = await dialog.showMessageBox(winOf(e), {

@@ -39,7 +39,7 @@
   // a, b: { bpm, beatPhase, key, rootKey?, energy?, energyHop?, offset, dur, start }
   //   zaman alanları kaynak (şarkı) saniyesidir; start zaman çizelgesindeki konumdur.
   // H: { semitonesToMatch(key, refKey) } (analysis.js)
-  function suggestTransitions(a, b, H, { max = 3, crossfadeBeats = CROSSFADE_BEATS } = {}) {
+  function suggestTransitions(a, b, H, { max = 3, crossfadeBeats = CROSSFADE_BEATS, minPlayed = 0 } = {}) {
     const pA = 60 / a.bpm;
     const pB = 60 / b.bpm;
 
@@ -76,7 +76,8 @@
       if (best) entries.push({ t: best.t, kind: 'drop', jump: best.jump });
     }
 
-    const lo = Math.max(a.offset + STEP_BEATS * pA, aEnd - SEARCH_BACK);
+    // minPlayed: A'nın geçişten önce en az bu kadar (kaynak sn) çalması istenir (otomatik karıştırmada kısa parçalar çok erken kesilmesin).
+    const lo = Math.max(a.offset + STEP_BEATS * pA, aEnd - SEARCH_BACK, a.offset + minPlayed);
     const hi = aEnd - MIN_FADE_BEATS * pA;
     const step = STEP_BEATS * pA;
     const first = a.beatPhase + Math.ceil((lo - a.beatPhase) / step - 1e-6) * step;

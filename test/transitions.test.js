@@ -37,3 +37,11 @@ test('Geçiş noktaları A\'nın vuruş ızgarasında', () => {
     assert.ok(Math.abs(k - Math.round(k)) < 1e-6);
   }
 });
+
+test('minPlayed: A en az o kadar çaldıktan sonra geçilir', () => {
+  const a = track({ dur: 40, energy: energy(80, () => 1) });
+  const early = Transitions.suggestTransitions(a, track({ start: 40 }), Analysis, { max: 5 });
+  const late = Transitions.suggestTransitions(a, track({ start: 40 }), Analysis, { max: 5, minPlayed: 24 });
+  assert.ok(Math.min(...early.map((s) => s.aPoint)) < 24, 'kısıtsız öneri erken bir nokta içermeli');
+  for (const s of late) assert.ok(s.aPoint >= 24 - 1e-6, `aPoint ${s.aPoint}`);
+});

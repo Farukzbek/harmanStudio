@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('harman', {
   autosaveClear: () => ipcRenderer.invoke('autosave-clear'),
   locateFile: (name) => ipcRenderer.invoke('locate-file', name),
   confirmUnsaved: (name, action) => ipcRenderer.invoke('confirm-unsaved', { name, action }),
+  confirmAction: (message, detail, ok) => ipcRenderer.invoke('confirm-action', { message, detail, ok }),
   confirmRestore: (info) => ipcRenderer.invoke('confirm-restore', info),
   closeWindow: (ok) => ipcRenderer.invoke('close-window', ok),
   setTitle: (title) => ipcRenderer.invoke('set-title', title),

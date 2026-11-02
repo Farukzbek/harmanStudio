@@ -2645,6 +2645,7 @@ function clipMenu(time, track) {
     { label: 'Vokal / enstrüman ayır…', hint: '⇧⌘S', run: openSeparate },
     { label: 'Tempo ve tonu eşleştir…', hint: '⇧⌘M', run: showMatchPanel },
     { label: 'Geçiş önerileri…', run: () => { showMatchPanel(); findTransitions(); } },
+    { label: 'Şarkıları otomatik sırala ve karıştır…', run: automix },
     { label: 'Parçayı sıfırla…', disabled: !primary || isPristine(primary), run: () => el.insReset.click() },
     'sep',
     { label: many ? 'Seçilenleri sil' : 'Sil', hint: '⌫', danger: true, run: deleteSelected },
@@ -2658,6 +2659,7 @@ function laneMenu(time, track) {
     'sep',
     { label: 'Tümünü seç', hint: '⌘A', disabled: !state.clips.length, run: () => { setSelection(state.clips.map((c) => c.id)); syncSelectionUI(); } },
     { label: 'Şarkı ekle…', hint: '⌘O', run: pickAndAdd },
+    { label: 'Şarkıları otomatik sırala ve karıştır…', disabled: state.clips.length < 2, run: automix },
     'sep',
     { label: state.trackOn[track] ? `${TRACK_NAMES[track]}. hattı sessize al` : `${TRACK_NAMES[track]}. hattı çaldır`, run: () => toggleTrack(track) },
   ];
@@ -2754,7 +2756,7 @@ function renderTransitions(list, a, b) {
   }));
 }
 
-async function applyTransition(s, aId, bId, listen) {
+async function applyTransition(s, aId, bId, listen, { inBusy = false } = {}) {
   const a0 = state.clips.find((c) => c.id === aId);
   const b0 = state.clips.find((c) => c.id === bId);
   if (!a0 || !b0) return toast('Parçalar değişmiş, önerileri yeniden bul');
@@ -2806,6 +2808,11 @@ async function applyTransition(s, aId, bId, listen) {
     });
   });
 
+  if (inBusy) {
+    await job();
+    layoutAll();
+    return;
+  }
   if (needRetarget) {
     const ok = await runBusy('Geçiş uygulanıyor', job);
     if (!ok) return;
@@ -2825,6 +2832,79 @@ async function applyTransition(s, aId, bId, listen) {
     play();
     toast('Geçiş döngüde çalıyor. Kapatmak için L');
   }
+}
+
+// ---------------------------------------------------- otomatik sırala ve karıştır
+// Seçili parçaları (seçim yoksa hepsini) birbirine en uygun sıraya dizer ve her ardışık çift için en iyi
+// geçişi uygular. Sıra açgözlü seçilir: en soldaki parçadan başlar, her adımda tempoca ve tonca en yakın
+// kalan parça gelir. Tempo/ton değişimi eşleştirme bölümündeki kutulara uyar. Hepsi tek geri alma adımıdır.
+function transitionCost(a, b) {
+  const dist = (f) => Math.abs(Math.log((a.bpm * f) / b.bpm));
+  const factor = [0.5, 1, 2].reduce((best, f) => (dist(f) < dist(best) ? f : best), 1);
+  const pct = Math.abs((a.bpm * factor) / b.bpm - 1) * 100;
+  const semis = Math.abs(Analysis.semitonesToMatch(b.key, a.key));
+  return pct * 0.6 + semis * 1.2;
+}
+
+function planOrder(clips) {
+  const rest = [...clips].sort((x, y) => x.start - y.start);
+  const order = [rest.shift()];
+  while (rest.length) {
+    const cur = sourceOf(order[order.length - 1]);
+    let best = 0;
+    let bestCost = Infinity;
+    rest.forEach((c, i) => {
+      const cost = transitionCost(cur, sourceOf(c));
+      if (cost < bestCost) { bestCost = cost; best = i; }
+    });
+    order.push(rest.splice(best, 1)[0]);
+  }
+  return order;
+}
+
+async function automix() {
+  const picked = selectedClips().length > 1 ? selectedClips() : state.clips;
+  if (picked.length < 2) return toast('Karıştırmak için en az iki parça ekle');
+  if (picked.some((c) => sourceOf(c).analysis !== 'done')) return toast('Parçaların analizi bitmedi, birkaç saniye sonra tekrar dene');
+  const order = planOrder(picked);
+  const names = order.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
+  const ok = await window.harman.confirmAction(
+    `${order.length} parça şu sırayla karıştırılacak`,
+    `${names.length > 600 ? `${names.slice(0, 600)}…` : names}\n\nHer geçişte tempo ve ton eşleştirilir (parça başına birkaç saniye sürer). ⌘Z ile tek adımda geri alabilirsin.`,
+    'Karıştır',
+  );
+  if (!ok) return;
+  const ids = order.map((c) => c.id);
+  let made = 0;
+  const done = await runBusy('Otomatik karıştırma', () => groupUndo(async () => {
+    for (let i = 0; i < ids.length - 1; i++) {
+      setSepProgress({ text: `Geçiş ${i + 1} / ${ids.length - 1}`, detail: order[i + 1].name, pct: (i / (ids.length - 1)) * 100 });
+      const a = state.clips.find((c) => c.id === ids[i]);
+      const b = state.clips.find((c) => c.id === ids[i + 1]);
+      const [s] = Transitions.suggestTransitions(describeForTransition(a), describeForTransition(b), Analysis, { max: 1, crossfadeBeats: tempo.fadeBeats, minPlayed: a.dur * 0.6 });
+      if (s) {
+        await applyTransition(s, a.id, b.id, false, { inBusy: true });
+      } else {
+        // Uygun nokta bulunamadı (kısa parça gibi): B, A'nın sonuna kısa bir crossfade ile eklenir.
+        mutate(() => {
+          const fade = Math.min(6, a.dur / 2, b.dur / 2);
+          b.start = Math.max(0, clipEnd(a) - fade);
+          a.fadeOut = fade;
+          b.fadeIn = fade;
+          b.track = [0, 1, 2, 3].find((t) => t !== a.track);
+          laneOf(b.track).appendChild(b.el);
+        });
+      }
+      made++;
+    }
+  }));
+  if (!done) return;
+  setSelection([]);
+  syncSelectionUI();
+  layoutAll();
+  fitAll();
+  goTo(0);
+  toast(`${made + 1} parça karıştırıldı. ⌘Z ile geri alabilirsin`);
 }
 
 el.transFind.addEventListener('click', findTransitions);
@@ -3251,6 +3331,7 @@ const actions = {
   delete: deleteSelected,
   play: togglePlay,
   loop: toggleLoop,
+  automix,
   start: () => { goTo(0); el.timeline.scrollLeft = 0; },
   end: () => goTo(projectEnd()),
   'zoom-in': () => zoomBy(1.4),
