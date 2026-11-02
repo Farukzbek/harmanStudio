@@ -55,7 +55,7 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Kaydedilmemiş değişiklik varken pencereyi kapatırsan (ya da ⌘Q) Kaydet / Kaydetme / Vazgeç diye sorar
 
 **Çıktı**
-- Çıktı ayarları: **Araba** (MP3 320 kbps), **Telefon** (MP3 192 kbps), **Kayıpsız** (WAV); normalize da buna göre ayarlanır. Dosya türü kaydetme penceresinde değiştirilebilir
+- Çıktı biçimi: **MP3** (320 kbps) ya da **WAV** (kayıpsız); normalize da buna göre ayarlanır (WAV'da kapalı). Dosya türü kaydetme penceresinde de değiştirilebilir
 - İsteğe bağlı normalize: mix'in en yüksek ses tepesini −1 dB'e ayarlar
 
 ## Gereksinimler

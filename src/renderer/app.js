@@ -2101,19 +2101,21 @@ function encodeWav(buffer) {
 
 // Çıktı ayarları: biçim, MP3 kalitesi ve normalize birlikte seçilir.
 const EXPORT_PRESETS = {
-  car: { format: 'mp3', kbps: 320, normalize: true },        // araba / hoparlör: en yüksek MP3 kalitesi
-  phone: { format: 'mp3', kbps: 192, normalize: true },      // telefon, paylaşım: küçük dosya
-  lossless: { format: 'wav', kbps: 0, normalize: false },    // arşiv, başka bir programda işlemek için
+  mp3: { format: 'mp3', kbps: 320, normalize: true },       // küçük dosya, arabada ve telefonda dinlemek için
+  wav: { format: 'wav', kbps: 0, normalize: false },        // kayıpsız: arşiv, başka bir programda işlemek için
 };
+// Eski sürümlerde kaydedilmiş seçimler.
+const LEGACY_PRESETS = { car: 'mp3', phone: 'mp3', lossless: 'wav' };
 function applyExportPreset(key, { remember = true } = {}) {
-  const preset = EXPORT_PRESETS[key] || EXPORT_PRESETS.car;
-  el.exportPreset.value = EXPORT_PRESETS[key] ? key : 'car';
+  key = LEGACY_PRESETS[key] || key;
+  const preset = EXPORT_PRESETS[key] || EXPORT_PRESETS.mp3;
+  el.exportPreset.value = EXPORT_PRESETS[key] ? key : 'mp3';
   state.normalize = preset.normalize;
   el.normalize.setAttribute('aria-checked', String(state.normalize));
   if (remember) { try { localStorage.setItem('harman.exportPreset', el.exportPreset.value); } catch { /* özel pencere */ } }
 }
 el.exportPreset.addEventListener('change', () => { applyExportPreset(el.exportPreset.value); markDirty(); });
-try { applyExportPreset(localStorage.getItem('harman.exportPreset') || 'car', { remember: false }); } catch { applyExportPreset('car', { remember: false }); }
+try { applyExportPreset(localStorage.getItem('harman.exportPreset') || 'mp3', { remember: false }); } catch { applyExportPreset('mp3', { remember: false }); }
 
 async function exportMix() {
   if (!state.clips.length) return toast('Önce bir şarkı ekle');
@@ -3241,7 +3243,7 @@ async function startTour() {
     { targets: ['.transport', '#lcd'], title: 'Oynatma ve sayaç', html: '<p><kbd>Boşluk</kbd> tıkladığın yerden çalar. Sayaca tıklayıp saniye yazarak istediğin yere git.</p><p><kbd>L</kbd> seçili parçayı ya da uyguladığın geçişi döngüde dinletir.</p>' },
     { targets: ['.zoom'], title: 'Yakınlaştırma', html: '<p><kbd>⌥</kbd> + kaydır ya da trackpad\'de sıkıştır. <kbd>⌘0</kbd> hepsini sığdırır.</p><p>Yakınlaştıkça vuruş çizgileri görünür; kesimleri vuruşa oturtmak kolaylaşır.</p>' },
     { targets: ['#inspector'], title: 'Parça ayarları', html: '<p>Bir parçayı seçince burada: seviye, sol/sağ denge, bas ve tiz, BPM ve ton, başka bir parçaya tempo-ton eşleştirme, <b>Geçiş öner</b>, vokal/enstrüman ayırma ve fade.</p><p>Birden çok parça seçiliyse ayarlar hepsine birlikte uygulanır.</p>' },
-    { targets: ['#export-preset', '.switch-group', '#btn-export'], title: 'Kaydet ve dışa aktar', html: '<p>Çıktı ayarını seç (Araba, Telefon, Kayıpsız), normalize\'i aç ya da kapat ve <b>Mix\'i kaydet</b>.</p><p><kbd>⌘S</kbd> projeni saklar; çalışırken 15 saniyede bir otomatik yedek alınır, beklenmedik kapanmada geri yüklenir.</p>' },
+    { targets: ['#export-preset', '.switch-group', '#btn-export'], title: 'Kaydet ve dışa aktar', html: '<p>Çıktı biçimini seç (MP3 ya da WAV), normalize\'i aç ya da kapat ve <b>Mix\'i kaydet</b>.</p><p><kbd>⌘S</kbd> projeni saklar; çalışırken 15 saniyede bir otomatik yedek alınır, beklenmedik kapanmada geri yüklenir.</p>' },
     { targets: ['#btn-help'], title: 'Kısayollar ve rehber', html: '<p>Tüm kısayollar ve hareketler burada (<kbd>⌘/</kbd>). Aynı pencerede <b>Rehberi başlat</b> düğmesi bu turu baştan açar; Yardım menüsünden de ulaşabilirsin.</p>' },
     { title: 'Kurulum durumu', html: `${checks}<p>Hepsi bu kadar. İyi karışımlar!</p>` },
   ];
