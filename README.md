@@ -58,6 +58,18 @@ npm run package
 
 `dist/` altına `Harman.app` üretir ve masaüstüne kısayol koyar. İkon betiği (`scripts/make-icon.js`) ilk derlemede çalışır.
 
+Harman o sırada açıksa açık penceredeki çalışmayı bozmamak için yeni sürüm `dist-next/` klasörüne derlenir ve masaüstü kısayoluna dokunulmaz. Harman'ı kapatıp komutu tekrar çalıştırınca kısayol güncellenir.
+
+## Projeler ve otomatik yedek
+
+Çalışmanı ⌘S ile kaydedersen `Şarkı.harman` dosyası ve yanında `Şarkı.harman-data/` klasörü oluşur. Varsayılan konum `Belgeler/Harman Projeleri`.
+
+- `.harman`: küçük bir JSON dosyası. Parçaların konumu, kırpması, fade'leri, seviyeleri, dengeleri, zamanlı geçişleri, BPM/ton bilgisi ve görünüm ayarları burada.
+- `.harman-data/`: tempo/ton ile türetilmiş sesler ve ayrılmış vokal/enstrüman parçaları (16-bit WAV). Açarken yeniden ayırmak veya işlemek gerekmez. Orijinal şarkılar buraya kopyalanmaz, dosya yoluyla bağlanır; taşırsan açılışta yeni yerini sorar.
+- Projeyi başka bir yere taşırken `.harman` dosyasıyla `-data` klasörünü birlikte taşı. Ayrılmış sesler çok yer tutar (bir şarkı için yaklaşık 150 MB).
+- **Otomatik yedek:** değişiklik varken 15 saniyede bir `~/Library/Application Support/Harman/autosave` altına yazılır. Uygulama beklenmedik kapanırsa bir sonraki açılışta geri yüklemeyi önerir; düzgün kapatınca ya da kaydedince silinir.
+- Kaydedilmemiş değişiklik varken pencereyi kapatırsan Kaydet / Kaydetme / Vazgeç sorulur.
+
 ## Vokal / enstrüman ayırma
 
 Ayırma tamamen bilgisayarında çalışır, dosyaların dışarı gönderilmez.
@@ -174,6 +186,7 @@ Ses, Web Audio ile arayüzde çalınır ve kaydedilir; ağır işler (ayırma, t
 - Yalnızca macOS / Apple Silicon denendi. Vokal ayırma MLX gerektirdiği için Intel Mac ve diğer sistemlerde çalışmaz.
 - Tempo ve ton tespiti gerçek müzikle geniş ölçekte denenmedi; ton tespiti özellikle tahminidir.
 - Zamanlı geçişler form ile girilir; parçanın üstünde fareyle çekilen bir eğri yok.
+- Proje dosyaları taşınabilir ama orijinal şarkılara dosya yoluyla bağlıdır; başka bilgisayara taşırken şarkıları da götür.
 - Toplu seçimde yan panel birincil parçayı gösterir; seviye ve fade gibi ayarlar şimdilik yalnızca o parçaya uygulanır.
 
 ## Fikirler
