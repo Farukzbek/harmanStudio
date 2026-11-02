@@ -919,3 +919,5 @@ input[type="range"]:disabled { opacity: 0.45; }
 .lib-item .btn { grid-column: 2; grid-row: 1 / span 2; }
 .lib-fit { margin-left: 6px; padding: 1px 6px; border-radius: 5px; font: 600 9.5px var(--sans, inherit); background: var(--accent-soft); color: var(--accent); }
 .lib-fit.far { background: #2a2e37; color: var(--text-dim); }
+
+.inline-row .grow { flex: 1; justify-content: center; }

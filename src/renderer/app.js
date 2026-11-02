@@ -71,7 +71,7 @@ const el = {
   sepBar: $('sep-bar'), sepDetail: $('sep-detail'), sepStart: $('sep-start'), sepStop: $('sep-stop'),
   sepTitle: $('sep-title'),
   tempoStatus: $('tempo-status'), tempoReady: $('tempo-ready'),
-  bpmInput: $('bpm-input'), bpmHalf: $('bpm-half'), bpmDouble: $('bpm-double'),
+  bpmInput: $('bpm-input'), bpmTap: $('bpm-tap'), bpmHalf: $('bpm-half'), bpmDouble: $('bpm-double'),
   keyTonic: $('key-tonic'), keyMode: $('key-mode'), keyCode: $('key-code'),
   matchBox: $('match-box'), matchRef: $('match-ref'),
   matchTempo: $('match-tempo'), matchTempoText: $('match-tempo-text'),
@@ -2601,7 +2601,7 @@ function updateTempo(clip) {
   el.keyMode.value = src.key.mode;
   el.keyCode.textContent = Analysis.camelot(src.key).code;
   // Tempo/ton değişmiş bir parçada orijinal değerler kilitli; önce "orijinale dön".
-  for (const input of [el.bpmInput, el.bpmHalf, el.bpmDouble, el.keyTonic, el.keyMode]) input.disabled = derived;
+  for (const input of [el.bpmInput, el.bpmHalf, el.bpmDouble, el.bpmTap, el.keyTonic, el.keyMode]) input.disabled = derived;
 
   const cands = refCandidates(clip);
   if (tempo.forClip !== clip.id) {
@@ -3980,6 +3980,25 @@ el.bpmInput.addEventListener('change', () => {
   if (root && Number(el.bpmInput.value) > 0) setRootBpm(root, Number(el.bpmInput.value));
   else updateInspector();
 });
+// Ritme vurma: vuruşlar arası medyan aralıktan BPM hesaplanır; 2,5 sn vuruş gelmezse sayım sıfırlanır.
+const taps = [];
+let tapTimer = null;
+function tapTempo() {
+  const root = editableRoot();
+  if (!root) return toast('BPM, tempo ve tonu değiştirilmemiş bir parçada ayarlanır');
+  const now = performance.now();
+  if (taps.length && now - taps[taps.length - 1] > 2500) taps.length = 0;
+  taps.push(now);
+  if (taps.length > 10) taps.shift();
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => { taps.length = 0; el.bpmTap.textContent = 'Vur (T)'; }, 2500);
+  if (taps.length < 3) { el.bpmTap.textContent = `${taps.length}…`; return; }
+  const gaps = taps.slice(1).map((t, i) => t - taps[i]).sort((a, b) => a - b);
+  const bpm = 60000 / gaps[Math.floor(gaps.length / 2)];
+  el.bpmTap.textContent = `${Math.round(bpm * 10) / 10} · devam`;
+  setRootBpm(root, bpm);
+}
+el.bpmTap.addEventListener('click', tapTempo);
 el.bpmHalf.addEventListener('click', () => { const r = editableRoot(); if (r) setRootBpm(r, r.bpm / 2); });
 el.bpmDouble.addEventListener('click', () => { const r = editableRoot(); if (r) setRootBpm(r, r.bpm * 2); });
 const onKeyEdit = () => {
@@ -4352,6 +4371,7 @@ document.addEventListener('keydown', (e) => {
     case 'Space': e.preventDefault(); document.activeElement?.blur(); (e.shiftKey ? resumePlay() : togglePlay()); break;
     case 'KeyS': splitSelected(); break;
     case 'KeyL': toggleLoop(); break;
+    case 'KeyT': tapTempo(); break;
     case 'F2': e.preventDefault(); beginRename(selected()); break;
     case 'KeyM': addMarkerAt(state.playhead); break;
     case 'KeyQ': case 'BracketLeft': trimToPlayhead('start'); break;
