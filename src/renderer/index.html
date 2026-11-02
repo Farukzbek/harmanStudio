@@ -308,6 +308,19 @@
     <span id="st-modes"></span>
   </footer>
 
+  <div id="history" class="modal" hidden>
+    <div class="sheet slim" role="dialog" aria-label="Geri alma geçmişi">
+      <header>
+        <h2>Geri alma geçmişi</h2>
+        <button id="history-close" class="icon-btn" title="Kapat (Esc)">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
+        </button>
+      </header>
+      <p class="hint">Bir adıma tıklarsan proje o adımın öncesine döner. Geri aldıklarını aşağıdaki "Geri alınanlar" bölümünden yeniden uygulayabilirsin.</p>
+      <div id="history-list" class="history-list"></div>
+    </div>
+  </div>
+
   <div id="help" class="modal" hidden>
     <div class="sheet" role="dialog" aria-label="Klavye kısayolları">
       <header>

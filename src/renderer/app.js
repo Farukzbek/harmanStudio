@@ -78,7 +78,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), meterBar: $('st-meter-bar'), peakText: $('st-peak'), meter: $('st-meter'), libFind: $('lib-find'), libList: $('lib-list'), libHint: $('lib-hint'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), history: $('history'), historyList: $('history-list'), meterBar: $('st-meter-bar'), peakText: $('st-peak'), meter: $('st-meter'), libFind: $('lib-find'), libList: $('lib-list'), libHint: $('lib-hint'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -283,20 +283,20 @@ function restore(snap) {
   onEdited();
 }
 
-function undo() {
-  if (!state.undo.length) return toast('Geri alınacak bir şey yok');
+function undo({ quiet = false } = {}) {
+  if (!state.undo.length) return quiet || toast('Geri alınacak bir şey yok');
   state.redo.push(snapshot());
   markDirty();
   restore(state.undo.pop());
-  toast('Geri alındı');
+  if (!quiet) toast('Geri alındı');
 }
 
-function redo() {
-  if (!state.redo.length) return toast('Yinelenecek bir şey yok');
+function redo({ quiet = false } = {}) {
+  if (!state.redo.length) return quiet || toast('Yinelenecek bir şey yok');
   state.undo.push(snapshot());
   markDirty();
   restore(state.redo.pop());
-  toast('Yinelendi');
+  if (!quiet) toast('Yinelendi');
 }
 
 // ------------------------------------------------------------ ses yükleme
@@ -3961,6 +3961,7 @@ const actions = {
   delete: deleteSelected,
   play: togglePlay,
   loop: toggleLoop,
+  history: () => toggleHistory(true),
   'marker-add': () => addMarkerAt(state.playhead),
   'open-recent': (file) => openProjectPath(file),
   'step-back': () => movePlayhead(state.playhead - fineStep()),
@@ -4156,6 +4157,102 @@ function startScrub(e) {
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
 }
+
+// ------------------------------------------------------- geri alma geçmişi
+// Her adımın ne yaptığı, öncesi ve sonrası görüntüleri karşılaştırılarak çıkarılır.
+const CHANGE_LABELS = [
+  [['srcId'], 'Tempo / ton değişti'],
+  [['start', 'track'], 'Parça taşındı'],
+  [['offset', 'dur'], 'Kırpma / bölme'],
+  [['gain'], 'Seviye'],
+  [['pan'], 'Sol / sağ denge'],
+  [['fadeIn', 'fadeOut'], 'Fade'],
+  [['stemRamps'], 'Zamanlı geçiş'],
+  [['stemGains', 'stemPans'], 'Ses parçası ayarı'],
+  [['eqLow', 'eqHigh', 'bassSwap'], 'EQ / bas takası'],
+  [['name'], 'Yeniden adlandırma'],
+  [['hue'], 'Renk'],
+  [['mute', 'solo'], 'Sessiz / solo'],
+];
+
+function describeChange(beforeSnap, afterSnap) {
+  const a = JSON.parse(beforeSnap);
+  const b = JSON.parse(afterSnap);
+  const labels = [];
+  if (b.c.length > a.c.length) labels.push(b.c.length - a.c.length > 1 ? `${b.c.length - a.c.length} parça eklendi` : 'Parça eklendi');
+  else if (b.c.length < a.c.length) labels.push(a.c.length - b.c.length > 1 ? `${a.c.length - b.c.length} parça silindi` : 'Parça silindi');
+  const byId = new Map(a.c.map((c) => [c.id, c]));
+  const changed = new Set();
+  const touched = new Set();
+  for (const c of b.c) {
+    const o = byId.get(c.id);
+    if (!o) continue;
+    for (const k of Object.keys(c)) {
+      if (JSON.stringify(c[k]) !== JSON.stringify(o[k])) { changed.add(k); touched.add(c.id); }
+    }
+  }
+  const found = CHANGE_LABELS.filter(([keys]) => keys.some((k) => changed.has(k))).map(([, label]) => label);
+  if (found.length > 2) labels.push('Birden çok değişiklik');
+  else labels.push(...found);
+  if (JSON.stringify(a.m) !== JSON.stringify(b.m)) labels.push('İşaretçi');
+  if (!labels.length) return 'Değişiklik';
+  let text = labels.join(' + ');
+  if (touched.size > 1) text += ` (${touched.size} parça)`;
+  return text;
+}
+
+function renderHistory() {
+  const list = el.historyList;
+  list.replaceChildren();
+  const add = (parent, label, n, cls, onClick) => {
+    const b = document.createElement('button');
+    b.className = `history-item ${cls}`;
+    const num = document.createElement('span');
+    num.className = 'n';
+    num.textContent = n;
+    b.append(num, document.createTextNode(label));
+    if (onClick) b.addEventListener('click', onClick); else b.disabled = true;
+    parent.appendChild(b);
+  };
+  const cur = snapshot();
+  const undoLen = state.undo.length;
+  // Şu an
+  add(list, 'Şu anki durum', '●', 'now', null);
+  // Yapılanlar: en yeni önce. k. adım undo[k] → undo[k+1] (son adım: şimdiki duruma).
+  for (let k = undoLen - 1; k >= 0; k--) {
+    const after = k + 1 < undoLen ? state.undo[k + 1] : cur;
+    add(list, describeChange(state.undo[k], after), String(k + 1), '', () => {
+      for (let i = 0; i < undoLen - k; i++) undo({ quiet: true });
+      toast('Seçilen adımın öncesine dönüldü');
+      renderHistory();
+    });
+  }
+  if (!undoLen) { const p = document.createElement('p'); p.className = 'history-empty'; p.textContent = 'Henüz geri alınacak bir adım yok.'; list.appendChild(p); }
+  // Geri alınanlar: sırayla yinelenebilir.
+  if (state.redo.length) {
+    const h = document.createElement('h4');
+    h.textContent = 'Geri alınanlar';
+    list.appendChild(h);
+    let prev = cur;
+    for (let i = state.redo.length - 1, step = 1; i >= 0; i--, step++) {
+      const next = state.redo[i];
+      const steps = step;
+      add(list, describeChange(prev, next), `+${step}`, 'undone', () => {
+        for (let j = 0; j < steps; j++) redo({ quiet: true });
+        toast('Adımlar yeniden uygulandı');
+        renderHistory();
+      });
+      prev = next;
+    }
+  }
+}
+
+function toggleHistory(show = el.history.hidden) {
+  el.history.hidden = !show;
+  if (show) renderHistory();
+}
+$('history-close').addEventListener('click', () => toggleHistory(false));
+el.history.addEventListener('pointerdown', (e) => { if (e.target === el.history) toggleHistory(false); });
 
 // ---------------------------------------------------------------- işaretçiler
 // M: oynatma çizgisine isimli bir nokta koyar ("nakarat", "drop"). Tıkla: oraya git. Sürükle: taşı.
@@ -4358,6 +4455,10 @@ document.addEventListener('keydown', (e) => {
   if (ctxClose) return;
   if (!el.sep.hidden) {
     if (e.key === 'Escape' && !sep.running) closeSep();
+    return;
+  }
+  if (!el.history.hidden) {
+    if (e.key === 'Escape') toggleHistory(false);
     return;
   }
   if (!el.help.hidden) {

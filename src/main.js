@@ -162,6 +162,7 @@ function buildMenu() {
       submenu: [
         item('Geri Al', 'undo', 'CmdOrCtrl+Z'),
         item('Yinele', 'redo', 'Shift+CmdOrCtrl+Z'),
+        item('Geri Alma Geçmişi…', 'history', null),
         sep,
         item('Kes', 'cut', 'CmdOrCtrl+X'),
         item('Kopyala', 'copy', 'CmdOrCtrl+C'),

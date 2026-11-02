@@ -930,3 +930,14 @@ input[type="range"]:disabled { opacity: 0.45; }
 .meter-track i.clip { background: #ff5d5d; }
 #st-peak { min-width: 52px; font: 500 10.5px var(--mono); color: var(--text-faint); }
 #st-peak.over { color: #ff5d5d; }
+
+/* geri alma geçmişi */
+.sheet.slim { width: min(440px, calc(100vw - 48px)); }
+.history-list { display: grid; gap: 2px; margin-top: 8px; max-height: 52vh; overflow: auto; }
+.history-list h4 { margin: 10px 0 4px; }
+.history-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.history-item:hover { background: rgba(255, 255, 255, 0.06); }
+.history-item .n { flex: none; width: 24px; color: var(--text-faint); font: 500 10.5px var(--mono); }
+.history-item.now { background: var(--accent-soft); color: var(--accent); cursor: default; }
+.history-item.undone { color: var(--text-dim); }
+.history-empty { padding: 8px 10px; color: var(--text-faint); }
