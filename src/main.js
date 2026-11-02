@@ -144,7 +144,7 @@ function buildMenu() {
     },
     {
       label: 'Yardım',
-      submenu: [item('Klavye Kısayolları', 'help', 'CmdOrCtrl+/')],
+      submenu: [item('Başlangıç Rehberi', 'welcome', null), item('Klavye Kısayolları', 'help', 'CmdOrCtrl+/')],
     },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -216,6 +216,11 @@ ipcMain.handle('native-edit', (e, cmd) => {
   ({ copy: () => wc.copy(), cut: () => wc.cut(), paste: () => wc.paste(), selectAll: () => wc.selectAll() })[cmd]?.();
 });
 ipcMain.handle('engine-status', () => engine.status());
+ipcMain.handle('env-status', () => ({
+  ffmpeg: FFMPEG_PATHS.some((p) => p.includes('/') && fs.existsSync(p)),
+  engine: engine.status().installed,
+  tools: tempo.status().installed,
+}));
 ipcMain.handle('engine-install', (e) => engine.install(progressSender(e, 'engine-progress')));
 ipcMain.handle('separate', (e, { filePath, model }) => engine.separate(filePath, model, progressSender(e, 'separate-progress')));
 ipcMain.handle('separate-cancel', () => engine.cancel());

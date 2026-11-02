@@ -8,7 +8,8 @@
   "scripts": {
     "start": "electron .",
     "package": "bash scripts/package.sh",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "dmg": "bash scripts/make-dmg.sh"
   },
   "devDependencies": {
     "@electron/packager": "^18.3.6",

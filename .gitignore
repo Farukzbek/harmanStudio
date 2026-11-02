@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-next/
+dist-dmg/
 .DS_Store
 *.log
 

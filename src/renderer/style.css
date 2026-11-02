@@ -471,6 +471,17 @@ body.drop-active .timeline { box-shadow: inset 0 0 0 2px var(--accent); }
   border: 1px solid var(--line);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
+.sheet.narrow { width: min(520px, calc(100vw - 48px)); }
+.steps { margin: 0 0 16px; padding-left: 20px; display: grid; gap: 9px; color: var(--text-dim); line-height: 1.5; }
+.steps b { color: var(--text); font-weight: 600; }
+.sheet h4 { margin: 4px 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-faint); }
+.checks { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+.checks li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; line-height: 1.45; }
+.checks .dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: #5bd39a; }
+.checks .dot.warn { background: #ffc247; }
+.checks small { display: block; color: var(--text-faint); }
+.checks code { font: 500 11.5px var(--mono); padding: 1px 6px; border-radius: 5px; background: #0f1114; border: 1px solid var(--line); }
+.sheet .actions { justify-content: flex-end; }
 .sheet header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .sheet h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }

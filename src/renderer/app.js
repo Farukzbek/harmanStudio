@@ -75,7 +75,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), exportPreset: $('export-preset'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), welcome: $('welcome'), welcomeChecks: $('welcome-checks'), exportPreset: $('export-preset'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -2924,6 +2924,25 @@ async function pickAndAdd() {
 
 function toggleHelp(show = el.help.hidden) { el.help.hidden = !show; }
 
+// Başlangıç rehberi: ilk açılışta (ve Yardım menüsünden) gösterilir; eksik kurulumları söyler.
+async function showWelcome() {
+  const st = await window.harman.envStatus();
+  const li = (ok, title, note, extra = '') => `<li><span class="dot${ok ? '' : ' warn'}"></span><span>${title}<small>${note}</small>${extra}</span></li>`;
+  el.welcomeChecks.innerHTML = [
+    li(st.ffmpeg, 'ffmpeg', st.ffmpeg ? 'Bulundu: MP3 kaydetme ve tüm ses biçimleri çalışır.' : 'Bulunamadı. MP3 kaydetmek için gerekir; Terminal\'de şunu çalıştır:', st.ffmpeg ? '' : '<code>brew install ffmpeg</code>'),
+    li(st.engine, 'Vokal / enstrüman ayırma', st.engine ? 'Kurulu.' : 'İlk kullanımda otomatik kurulur (yaklaşık 1 GB indirme, bir kez).'),
+    li(st.tools, 'Tempo ve ton aracı', st.tools ? 'Kurulu.' : 'İlk kullanımda otomatik kurulur (küçük indirme, bir kez).'),
+  ].join('');
+  el.welcome.hidden = false;
+}
+function closeWelcome() {
+  el.welcome.hidden = true;
+  try { localStorage.setItem('harman.welcomed', '1'); } catch { /* özel pencere */ }
+}
+$('welcome-close').addEventListener('click', closeWelcome);
+$('welcome-start').addEventListener('click', closeWelcome);
+el.welcome.addEventListener('pointerdown', (e) => { if (e.target === el.welcome) closeWelcome(); });
+
 // ------------------------------------------------------------------- proje
 // Proje = .harman (JSON) + yanındaki .harman-data klasörü. Orijinal şarkılar dosya yoluyla bağlanır
 // (kopyalanmaz); tempo/ton ile türetilmiş sesler ve ayrılmış parçalar 16-bit WAV olarak yan klasöre yazılır,
@@ -3338,6 +3357,7 @@ const actions = {
   'zoom-out': () => zoomBy(1 / 1.4),
   fit: fitAll,
   help: () => toggleHelp(),
+  welcome: showWelcome,
 };
 
 // ----------------------------------------------------------------- olaylar
@@ -3554,6 +3574,10 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !sep.running) closeSep();
     return;
   }
+  if (!el.welcome.hidden) {
+    if (e.key === 'Escape') closeWelcome();
+    return;
+  }
   if (!el.help.hidden) {
     if (e.key === 'Escape') toggleHelp(false);
     return;
@@ -3603,7 +3627,11 @@ document.addEventListener('keydown', (e) => {
 
 // -------------------------------------------------------------------- başlangıç
 buildTracks();
-offerRestore();
+offerRestore().then(() => {
+  let seen = false;
+  try { seen = !!localStorage.getItem('harman.welcomed'); } catch { /* özel pencere */ }
+  if (!seen && !state.clips.length) showWelcome();
+});
 [el.insGain, el.insFadeIn, el.insFadeOut].forEach(paintSlider);
 layoutAll();
 setZoom(state.pps);
