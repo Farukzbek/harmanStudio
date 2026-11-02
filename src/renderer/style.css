@@ -50,7 +50,7 @@ html, body {
 }
 .topbar > *, .topbar button, .topbar input, .topbar label { -webkit-app-region: no-drag; }
 .topbar .spacer { flex: 1; -webkit-app-region: drag; align-self: stretch; }
-.preset-select { max-width: 138px; text-overflow: ellipsis; height: 28px; padding: 0 22px 0 8px; border-radius: 7px; border: 1px solid var(--line); background: #14161a; color: var(--text); font: 500 12px var(--sans, inherit); cursor: pointer; }
+.preset-select { flex: none; width: 128px; max-width: 128px; text-overflow: ellipsis; height: 28px; padding: 0 22px 0 8px; border-radius: 7px; border: 1px solid var(--line); background: #14161a; color: var(--text); font: 500 12px var(--sans, inherit); cursor: pointer; }
 .preset-select:hover { border-color: #3a3f4a; }
 .brand { display: flex; align-items: center; gap: 8px; margin-right: 6px; -webkit-app-region: drag; }
 .brand-name { font-weight: 600; font-size: 13px; letter-spacing: 0.2px; }
@@ -109,6 +109,8 @@ html, body {
 
 .transport { display: flex; align-items: center; gap: 4px; }
 .lcd {
+  flex: none;
+  white-space: nowrap;
   display: flex;
   align-items: baseline;
   gap: 6px;
@@ -495,6 +497,13 @@ body.drop-active .timeline { box-shadow: inset 0 0 0 2px var(--accent); }
 @media (max-width: 1180px) {
   .brand-name, .project-name, .switch-label .lbl { display: none; }
   .zoom input[type="range"] { width: 80px; }
+}
+@media (max-width: 1080px) {
+  .topbar { gap: 5px; padding-right: 8px; }
+  .zoom input[type="range"] { width: 52px; }
+  .preset-select { width: 104px; max-width: 104px; }
+  .switch-group .info { display: none; }
+  .topbar .sep { margin: 0 1px; }
 }
 
 /* ------------------------------------------------------------ ses parçaları */

@@ -458,8 +458,29 @@ function drawClip(clip) {
     g.fillRect(x, mid - amp, 1, Math.max(1, amp * 2));
   }
 
-  // Fade bölgelerini gölgeyle ve eğriyle göster.
   const toX = (cssX) => (cssX - lo) * dpr;
+
+  // Vuruş çizgileri: yeterince yakınlaşınca analizdeki ızgara görünür (her 4 vuruş biraz daha belirgin).
+  // Kesim ve geçiş noktalarını vuruşa oturtmayı kolaylaştırır.
+  const bsrc = sourceOf(clip);
+  if (bsrc?.analysis === 'done' && bsrc.bpm > 0) {
+    const period = 60 / bsrc.bpm;
+    const stride = period * pps >= 9 ? 1 : period * pps * 4 >= 9 ? 4 : 0;
+    if (stride) {
+      const t0 = clip.offset + lo / pps;
+      const t1 = clip.offset + hi / pps;
+      let k = Math.ceil((t0 - bsrc.beatPhase) / period);
+      k += ((stride - (((k % stride) + stride) % stride)) % stride);     // stride'ın katına hizala
+      for (; bsrc.beatPhase + k * period <= t1; k += stride) {
+        const bx = Math.round(toX((bsrc.beatPhase + k * period - clip.offset) * pps));
+        const bar = (((k % 4) + 4) % 4) === 0;
+        g.fillStyle = bar ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.16)';
+        g.fillRect(bx, 0, Math.max(1, Math.round(dpr)), H);
+      }
+    }
+  }
+
+  // Fade bölgelerini gölgeyle ve eğriyle göster.
   const drawFade = (x0, x1, gainAt) => {
     if (x1 - x0 < 1) return;
     const pts = [];
