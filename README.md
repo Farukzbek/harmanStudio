@@ -21,6 +21,9 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Fareyle dikdörtgen çizerek toplu seçim; seçili parçaları birlikte taşı, böl, çoğalt, sil. Sürüklerken görünümün kenarına gelince otomatik kayar
 - Her hattın sağ altında bir kutucuk: kapatırsan o hattaki parçalar çalmaz (kaydedilen mix'e de girmez)
 - Her parça bağımsızdır: bir şarkıdan kesilen, çoğaltılan veya yapıştırılan parçaların BPM/ton düzeltmesi, vokal ayırma sonucu, tempo/ton değişikliği, zamanlı geçişleri ve sıfırlaması kendilerine aittir. Ses verisi paylaşıldığı için bellek harcanmaz; aynı sesten ayrılmış parçalar varsa yeniden hesaplanmadan kullanılır
+- İşaretçiler (**M**): oynatma çizgisine isimli nokta koy ("nakarat", "drop"). Cetvelde tıkla: git, sürükle: taşı, çift tıkla: adlandır, sağ tık: sil. ⌥ + ← / → işaretçilere de atlar. Projeyle saklanır, geri alınabilir
+- Parçayı yeniden adlandır (başlığa çift tıkla ya da **F2**) ve parçaya kendi rengini ver (yan panel)
+- Alt çubuk: parça sayısı, mix süresi, seçili parçanın özeti (BPM, ton, süre) ve açık kipler
 - Vuruşa yapışma: bölme (**S**), başı/sonu çizgiye kırpma (**Q** / **W**) ve kenar sürükleyerek kırpma, parçanın en yakın vuruşuna oturur. Görünüm → Vuruşa Yapış ile kapatılır; sürüklerken ⌘ basılıysa da devre dışıdır
 - Pencere boyutu ve konumu hatırlanır
 - Döngüde dinleme (**L**): seçili parçayı ya da uyguladığın geçişi tekrar tekrar çal; geçiş uygularken "Uygula ve döngüde dinle" geçiş bölgesini döngüye alır
@@ -46,6 +49,7 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - İlk açılışta giriş rehberi: tanıtılan bölüm aydınlık kalır, geri kalanı yumuşakça kararır. Atlanabilir; **Yardım → Başlangıç Rehberi** ya da kısayol penceresindeki (⌘/) "Rehberi başlat" düğmesiyle tekrar açılır. Son adımda ffmpeg ve motor kurulumlarının durumunu gösterir
 
 **Projeler ve güvenlik**
+- Son açılan 10 proje Dosya → Son Açılanlar menüsünde ve Dock ikonunda. `.harman` dosyasına çift tıklayınca (ya da Dock'taki Harman'a bırakınca) Harman'da açılır; bunun için uygulamanın `npm run package` ile derlenmiş olması gerekir
 - Projeyi kaydet / aç (`.harman`, ⌘S / ⌥⌘O): tüm parçalar, ayarlar, zamanlı geçişler, tempo/ton değişiklikleri ve ayrılmış sesler olduğu gibi geri gelir; açınca yeniden ayırmak veya işlemek gerekmez. Orijinal şarkılar kopyalanmaz, yolla bağlanır; taşınmışsa açılışta yeni konumu göstermeni ister
 - Otomatik yedek: değişiklik oldukça 15 saniyede bir arka planda yazılır. Uygulama çökerse ya da kapanırsa bir sonraki açılışta "geri yüklensin mi?" diye sorar
 - Kaydedilmemiş değişiklik varken pencereyi kapatırsan (ya da ⌘Q) Kaydet / Kaydetme / Vazgeç diye sorar
@@ -180,6 +184,9 @@ Uygulama içinde `⌘/` ile tam liste açılır.
 | ← / → | 1 sn geri / ileri (⇧ ile 5 sn). Çizgi ekran dışına çıkarsa görünüm bir sayfa kayar |
 | ⌘ + ← / → | İnce adım: yakınlığa göre yaklaşık 8 piksel (⇧ ile 5 kat) |
 | ⌥ + ← / → | Önceki / sonraki parça kenarına atla |
+| M | Oynatma çizgisine işaretçi koy |
+| F2 | Seçili parçayı yeniden adlandır |
+| ⌥ + ↑ / ↓ | Seçili parçayı bir hat yukarı / aşağı taşı |
 | L | Seçili parçayı döngüde dinle (tekrar L: kapat) |
 | ⌘S / ⌥⌘S | Projeyi kaydet / farklı kaydet |
 | ⌥⌘O / ⌘N | Proje aç / yeni proje |

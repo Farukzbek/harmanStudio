@@ -266,7 +266,10 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(0.95); }
 input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px rgba(255, 122, 69, 0.7); }
 
 /* ----------------------------------------------------------- zaman çizelgesi */
-.workspace { display: flex; height: calc(100% - 48px); }
+.workspace { display: flex; height: calc(100% - 48px - 24px); }
+.statusbar { display: flex; align-items: center; gap: 14px; height: 24px; padding: 0 12px; background: var(--panel); border-top: 1px solid var(--line); color: var(--text-faint); font-size: 11px; white-space: nowrap; overflow: hidden; }
+.statusbar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-dim); }
+.statusbar b { font-weight: 500; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 
 .timeline {
   position: relative;
@@ -876,3 +879,13 @@ input[type="range"]:disabled { opacity: 0.45; }
 @media (prefers-reduced-motion: reduce) {
   .tour, .tour-spot, .tour-card, .tour-card > * { transition-duration: 0.01s !important; }
 }
+
+/* parça rengi ve yeniden adlandırma */
+.swatches { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 14px; }
+.swatch { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: hsl(var(--h) 62% 58%); cursor: pointer; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset; }
+.swatch:hover { transform: scale(1.12); }
+.swatch[aria-pressed="true"] { border-color: #fff; }
+.swatch.auto { background: transparent; border: 1.5px dashed #6a7080; }
+.swatch.auto[aria-pressed="true"] { border: 2px solid #fff; }
+.clip-rename { width: 70%; min-width: 60px; height: 15px; margin: 0; padding: 0 4px; font: inherit; color: #fff; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 3px; outline: none; user-select: text; }
+.marker-rename { position: absolute; bottom: 2px; width: 120px; height: 15px; padding: 0 5px; font: 500 10px var(--sans, inherit); color: #0f2a1d; background: #8ff0c0; border: 1px solid #fff; border-radius: 3px; outline: none; user-select: text; z-index: 7; }

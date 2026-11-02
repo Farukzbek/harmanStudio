@@ -26,6 +26,7 @@ fi
   --platform=darwin --arch=arm64 --out="$OUT/app" --overwrite \
   --icon=build/icon.icns \
   --ignore='^/(dist|dist-next|dist-dmg|assets|scripts|test|build/icon-1024\.png|\.gitignore|README\.md)' \
+  --extend-info=scripts/Info-extra.plist \
   --app-bundle-id=com.harman.app
 
 cp -R "$OUT/app/Harman-darwin-arm64/Harman.app" "$STAGE/"

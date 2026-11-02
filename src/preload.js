@@ -54,6 +54,9 @@ contextBridge.exposeInMainWorld('harman', {
   closeWindow: (ok) => ipcRenderer.invoke('close-window', ok),
   setTitle: (title) => ipcRenderer.invoke('set-title', title),
   onCloseRequest: (cb) => { ipcRenderer.on('close-request', () => cb()); },
+  recentAdd: (file) => ipcRenderer.invoke('recent-add', file),
+  takePendingOpen: () => ipcRenderer.invoke('take-pending-open'),
+  onOpenProject: (cb) => { ipcRenderer.on('open-project', (_e, file) => cb(file)); },
   onFilesDropped: (cb) => { dropHandler = cb; },
   onMenu: (cb) => { ipcRenderer.on('menu', (_e, id, value) => cb(id, value)); },
 });

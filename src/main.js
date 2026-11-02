@@ -89,8 +89,28 @@ app.on('before-quit', () => { quitting = true; });
 
 // Menü; tıklamalar arayüze "menu" olayı olarak gider. registerAccelerator:false olanlar
 // yalnızca kısayolu göstermek içindir, tuşu arayüz kendisi dinler.
+// Son açılan / kaydedilen projeler (en yeni başta). Dock ikonundaki "Son Kullanılanlar" listesine de eklenir.
+const recentFile = () => path.join(app.getPath('userData'), 'recent.json');
+function readRecent() {
+  try {
+    const list = JSON.parse(fs.readFileSync(recentFile(), 'utf8'));
+    return Array.isArray(list) ? list.filter((p) => typeof p === 'string' && fs.existsSync(p)).slice(0, 10) : [];
+  } catch { return []; }
+}
+function addRecent(file) {
+  const list = [file, ...readRecent().filter((p) => p !== file)].slice(0, 10);
+  try { fs.writeFileSync(recentFile(), JSON.stringify(list)); } catch { /* yazılamazsa önemli değil */ }
+  app.addRecentDocument(file);
+  buildMenu();
+}
+const menuState = { snapBeats: true };
+
 function buildMenu() {
-  const send = (id) => (menuItem) => BrowserWindow.getAllWindows()[0]?.webContents.send('menu', id, menuItem?.checked);
+  const send = (id) => (menuItem) => {
+    if (id === 'snap-beats') menuState.snapBeats = menuItem.checked;
+    BrowserWindow.getAllWindows()[0]?.webContents.send('menu', id, menuItem?.checked);
+  };
+  const recent = readRecent();
   const item = (label, id, accelerator, extra = {}) => ({ label, accelerator, click: send(id), ...extra });
   const display = { registerAccelerator: false };
   const sep = { type: 'separator' };
@@ -115,6 +135,19 @@ function buildMenu() {
         item('Proje Aç…', 'project-open', 'Alt+CmdOrCtrl+O'),
         item('Projeyi Kaydet', 'project-save', 'CmdOrCtrl+S'),
         item('Projeyi Farklı Kaydet…', 'project-save-as', 'Alt+CmdOrCtrl+S'),
+        {
+          label: 'Son Açılanlar',
+          enabled: recent.length > 0,
+          submenu: [
+            ...recent.map((file) => ({
+              label: path.basename(file).replace(/\.harman$/, ''),
+              toolTip: file,
+              click: () => BrowserWindow.getAllWindows()[0]?.webContents.send('menu', 'open-recent', file),
+            })),
+            sep,
+            { label: 'Listeyi Temizle', click: () => { try { fs.rmSync(recentFile(), { force: true }); } catch { /* yok */ } app.clearRecentDocuments(); buildMenu(); } },
+          ],
+        },
         sep,
         item('Şarkı Ekle…', 'add', 'CmdOrCtrl+O'),
         item('Mix\'i Kaydet…', 'export', 'CmdOrCtrl+E'),
@@ -151,6 +184,7 @@ function buildMenu() {
         item('İnce Adım İleri', 'step-forward', 'CmdOrCtrl+Right', display),
         item('Önceki Parça Kenarı', 'edge-back', 'Alt+Left', display),
         item('Sonraki Parça Kenarı', 'edge-forward', 'Alt+Right', display),
+        item('İşaretçi Ekle', 'marker-add', 'M', display),
         item('Başa Dön', 'start', 'Return', display),
         item('Sona Git', 'end', 'End', display),
       ],
@@ -161,7 +195,7 @@ function buildMenu() {
         item('Yakınlaştır', 'zoom-in', 'CmdOrCtrl+='),
         item('Uzaklaştır', 'zoom-out', 'CmdOrCtrl+-'),
         item('Tümünü Sığdır', 'fit', 'CmdOrCtrl+0'),
-        item('Vuruşa Yapış', 'snap-beats', null, { type: 'checkbox', checked: true }),
+        item('Vuruşa Yapış', 'snap-beats', null, { type: 'checkbox', checked: menuState.snapBeats }),
         sep,
         { role: 'togglefullscreen', label: 'Tam Ekran' },
         ...(app.isPackaged ? [] : [sep, { role: 'toggleDevTools', label: 'Geliştirici Araçları' }]),
@@ -262,6 +296,28 @@ ipcMain.handle('stretch', (_e, args) => tempo.stretch(args));
 ipcMain.handle('write-temp-wav', (_e, wav) => tempo.writeTempWav(wav));
 ipcMain.handle('cleanup-dir', (_e, dir) => engine.cleanup(dir));
 app.on('before-quit', () => engine.cancel());
+
+// .harman dosyasına çift tıklama / Dock'a bırakma / komut satırı: pencere hazırsa hemen, değilse hazır olunca açılır.
+let pendingOpen = process.argv.find((a, i) => i > 0 && a.endsWith('.harman') && fs.existsSync(a)) || null;
+let rendererReady = false;
+app.on('open-file', (e, file) => {
+  e.preventDefault();
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win && rendererReady) {
+    win.webContents.send('open-project', file);
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  } else {
+    pendingOpen = file;
+  }
+});
+ipcMain.handle('take-pending-open', () => {
+  rendererReady = true;
+  const file = pendingOpen;
+  pendingOpen = null;
+  return file;
+});
+ipcMain.handle('recent-add', (_e, file) => addRecent(file));
 
 // ---------------------------------------------------------------- proje dosyaları
 const projectFilters = [{ name: 'Harman projesi', extensions: ['harman'] }];

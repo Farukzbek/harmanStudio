@@ -5,6 +5,7 @@ const SAMPLE_RATE = 44100;
 const TRACK_COUNT = 4;
 const TRACK_NAMES = ['1', '2', '3', '4'];
 const TRACK_HUES = [205, 28, 160, 275];
+const CLIP_HUES = [205, 28, 160, 275, 350, 48, 190, 310];     // parça rengi seçenekleri (yan panel)
 const GUTTER = 64;
 const TRACK_H = 88;             // css --track-h ile aynı              // hat etiketlerinin genişliği (px)
 const HEADER_H = 18;            // parça başlık şeridi (px)
@@ -18,7 +19,7 @@ const SNAP_PX = 8;
 const PPS_MIN = 0.5;            // yakınlık: saniye başına piksel
 const PPS_MAX = 240;
 const UNDO_LIMIT = 100;
-const PARAM_KEYS = ['id', 'srcId', 'name', 'track', 'start', 'offset', 'dur', 'fadeIn', 'fadeOut', 'gain', 'stemGains', 'pan', 'stemPans', 'stemRamps', 'eqLow', 'eqHigh', 'bassSwap'];
+const PARAM_KEYS = ['id', 'srcId', 'name', 'track', 'start', 'offset', 'dur', 'fadeIn', 'fadeOut', 'gain', 'stemGains', 'pan', 'stemPans', 'stemRamps', 'eqLow', 'eqHigh', 'bassSwap', 'hue'];
 const STEM_ORDER = ['vocals', 'instrumental', 'drums', 'bass', 'guitar', 'piano', 'other'];
 const STEM_LABELS = {
   vocals: 'Vokal', instrumental: 'Enstrüman', drums: 'Davul', bass: 'Bas',
@@ -46,6 +47,7 @@ const state = {
   pending: null,                // süren bir düzenlemenin başlangıç görüntüsü
   normalize: true,
   snapBeats: true,              // kırpma ve bölmede vuruşa yapış (Görünüm menüsü)
+  markers: [],                  // [{ id, t, name }] isimli noktalar (cetvelde bayrak olarak görünür)
   loop: null,                   // { from, to } saniye: çalarken bu aralık tekrarlanır
 };
 const keys = { ctrl: false };   // gerçek Ctrl tuşu (trackpad sıkıştırmasından ayırt etmek için)
@@ -76,7 +78,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), exportPreset: $('export-preset'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), exportPreset: $('export-preset'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -191,6 +193,8 @@ function clipPeaks(clip) {
 }
 
 const clipEnd = (c) => c.start + c.dur;
+// Parçanın rengi: elle seçilmediyse hattınki.
+const clipHue = (clip) => clip.hue ?? TRACK_HUES[clip.track];
 const selected = () => state.clips.find((c) => c.id === state.selectedId) || null;
 const projectEnd = () => state.clips.reduce((m, c) => Math.max(m, clipEnd(c)), 0);
 // Teknik hata iletilerini anlaşılır Türkçeye çevirir; tanınmayanlar olduğu gibi kalır.
@@ -228,7 +232,7 @@ function toast(msg, isError = false) {
 }
 
 // ------------------------------------------------------------ geri al / yinele
-const snapshot = () => JSON.stringify(state.clips.map((c) => Object.fromEntries(PARAM_KEYS.map((k) => [k, c[k]]))));
+const snapshot = () => JSON.stringify({ c: state.clips.map((c) => Object.fromEntries(PARAM_KEYS.map((k) => [k, c[k]]))), m: state.markers });
 
 function commitUndo(before) {
   markDirty();
@@ -262,7 +266,9 @@ async function groupUndo(fn) {
 
 function restore(snap) {
   state.clips.forEach((c) => c.el.remove());
-  state.clips = JSON.parse(snap).map((p) => {
+  const data = JSON.parse(snap);
+  state.markers = data.m || [];
+  state.clips = data.c.map((p) => {
     const src = state.sources.get(p.srcId);
     const clip = { ...p, buffer: src.buffer, peaks: src.peaks };
     createClipElement(clip);
@@ -394,6 +400,7 @@ function toggleTrack(i) {
   state.trackOn[i] = !state.trackOn[i];
   markDirty();
   trackChecks[i].setAttribute('aria-checked', String(state.trackOn[i]));
+  updateStatus();
   state.clips.forEach((c) => { if (c.track === i) c.el.classList.toggle('muted', !state.trackOn[i]); });
   // Çalarken yeniden başlatmadan yumuşakça aç/kapat.
   state.playing?.trackNodes[i].gain.setTargetAtTime(state.trackOn[i] ? 1 : 0, ctx.currentTime, 0.01);
@@ -416,6 +423,7 @@ function createClipElement(clip) {
   clip.el = node;
   clip.canvas = node.querySelector('canvas');
   node.addEventListener('pointerdown', (e) => beginDrag(e, clip));
+  node.querySelector('.clip-head').addEventListener('dblclick', () => beginRename(clip));
   laneOf(clip.track).appendChild(node);
 }
 
@@ -424,7 +432,7 @@ function positionClip(clip) {
   const w = Math.max(2, clip.dur * state.pps);
   clip.el.style.left = `${clip.start * state.pps}px`;
   clip.el.style.width = `${w}px`;
-  clip.el.style.setProperty('--hue', TRACK_HUES[clip.track]);
+  clip.el.style.setProperty('--hue', clipHue(clip));
   clip.el.classList.toggle('selected', state.selection.has(clip.id));
   clip.el.classList.toggle('muted', !state.trackOn[clip.track]);
   clip.el.querySelector('.clip-tag').textContent = tagText(clip);
@@ -460,7 +468,7 @@ function drawClip(clip) {
   const W = cv.width;
   const H = cv.height;
   const mid = H / 2;
-  const hue = TRACK_HUES[clip.track];
+  const hue = clipHue(clip);
   const bucketSec = PEAK_BUCKET / SAMPLE_RATE;
   const secPerDevPx = 1 / (pps * dpr);
   const peaks = clipPeaks(clip);
@@ -543,6 +551,7 @@ function drawClip(clip) {
   }
 }
 
+let markerHits = [];
 function drawRuler() {
   const view = el.timeline;
   const cv = el.rulerCanvas;
@@ -580,6 +589,28 @@ function drawRuler() {
       g.fillStyle = '#8b919d';
       g.fillText(formatTime(t, step < 1 ? 1 : 0), x + 4, 4);
     }
+  }
+
+  // İşaretçiler: cetvelin alt yarısında isimli bayraklar; tıklama için konumları saklanır.
+  markerHits = [];
+  g.font = '500 10px -apple-system, BlinkMacSystemFont, sans-serif';
+  g.textBaseline = 'middle';
+  for (const m of state.markers) {
+    const x = Math.round(GUTTER + m.t * state.pps - view.scrollLeft) + 0.5;
+    const label = m.name || 'İşaret';
+    const cw = Math.min(110, g.measureText(label).width + 10);
+    if (x + cw < GUTTER || x > w) continue;
+    g.strokeStyle = '#5bd39a';
+    g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(x, 2); g.lineTo(x, RULER_H); g.stroke();
+    g.fillStyle = '#5bd39a';
+    g.beginPath(); g.roundRect(x, RULER_H - 15, cw, 13, [0, 4, 4, 0]); g.fill();
+    g.fillStyle = '#0f2a1d';
+    g.save();
+    g.beginPath(); g.rect(x, RULER_H - 15, cw, 13); g.clip();
+    g.fillText(label, x + 5, RULER_H - 8.5);
+    g.restore();
+    markerHits.push({ id: m.id, x0: x - 3, x1: x + cw, y0: RULER_H - 16 });
   }
 
   // Döngü aralığı
@@ -734,13 +765,36 @@ function wireSlider(input, onValue) {
 }
 
 // -------------------------------------------------------------- yan panel
+// Alt çubuk: parça sayısı ve mix süresi, seçili parçanın özeti, açık olan kipler.
+function updateStatus() {
+  const n = state.clips.length;
+  el.stProject.textContent = n ? `${n} parça · mix ${formatTime(projectEnd(), 1)}` : 'Parça yok';
+  const c = selected();
+  if (!c) {
+    el.stSelection.textContent = n ? 'Seçili parça yok' : '';
+  } else {
+    const parts = [c.name, `${formatTime(c.start, 1)} – ${formatTime(clipEnd(c), 1)}`];
+    const tag = tagText(c);
+    if (tag) parts.push(tag);
+    if (state.selection.size > 1) parts.push(`+${state.selection.size - 1} parça seçili`);
+    el.stSelection.textContent = parts.join(' · ');
+  }
+  const modes = [];
+  if (state.snapBeats) modes.push('Vuruşa yapış');
+  if (state.loop) modes.push('Döngü');
+  if (!state.trackOn.every(Boolean)) modes.push('Sessiz hat var');
+  el.stModes.textContent = modes.join(' · ');
+}
+
 function updateInspector() {
+  updateStatus();
   const clip = selected();
   el.insEmpty.hidden = !!clip;
   el.insBody.hidden = !clip;
   if (!clip) return;
   el.insName.textContent = state.selection.size > 1 ? `${clip.name} +${state.selection.size - 1}` : clip.name;
-  el.insChip.style.setProperty('--hue', TRACK_HUES[clip.track]);
+  el.insChip.style.setProperty('--hue', clipHue(clip));
+  el.insColors.querySelectorAll('.swatch').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.hue === (clip.hue === undefined ? 'auto' : String(clip.hue)))));
   el.insStart.textContent = formatTime(clip.start, 2);
   el.insDur.textContent = formatTime(clip.dur, 2);
   const db = clip.gain > 0 ? 20 * Math.log10(clip.gain) : -Infinity;
@@ -1333,6 +1387,61 @@ el.transBass.addEventListener('click', () => {
   el.transBass.setAttribute('aria-checked', String(tempo.bassSwap));
 });
 
+// Parça rengi: seçili tüm parçalara uygulanır. "Hat rengi" (kesikli) elle seçimi kaldırır.
+for (const hue of [...CLIP_HUES, 'auto']) {
+  const b = document.createElement('button');
+  b.className = `swatch${hue === 'auto' ? ' auto' : ''}`;
+  b.dataset.hue = String(hue);
+  b.title = hue === 'auto' ? 'Hat rengi' : 'Parça rengi';
+  b.setAttribute('aria-label', b.title);
+  if (hue !== 'auto') b.style.setProperty('--h', hue);
+  b.addEventListener('click', () => {
+    if (!selected()) return;
+    mutate(() => { for (const c of selectedClips()) c.hue = hue === 'auto' ? undefined : hue; });
+    layoutAll();
+  });
+  el.insColors.appendChild(b);
+}
+
+// Yeniden adlandırma: parça başlığına çift tıkla, F2 ya da sağ tık menüsü. Enter kaydeder, Esc vazgeçer.
+function beginRename(clip) {
+  if (!clip || clip.el.querySelector('.clip-rename')) return;
+  const head = clip.el.querySelector('.clip-head');
+  const title = head.querySelector('.clip-title');
+  const input = document.createElement('input');
+  input.className = 'clip-rename';
+  input.type = 'text';
+  input.value = clip.name;
+  input.maxLength = 120;
+  input.setAttribute('aria-label', 'Parça adı');
+  input.addEventListener('pointerdown', (e) => e.stopPropagation());
+  input.addEventListener('dblclick', (e) => e.stopPropagation());
+  let done = false;
+  const finish = (commit) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    input.remove();
+    title.hidden = false;
+    if (commit && name && name !== clip.name) {
+      mutate(() => { clip.name = name; });
+      title.textContent = name;
+      updateInspector();
+      updateProjectUI();
+    }
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  title.hidden = true;
+  head.insertBefore(input, title);
+  input.focus();
+  input.select();
+}
+
 // Seviye eşitleme: her parçanın çaldığı bölümün RMS'i (ses parçaları varsa seviyeleriyle) ölçülür;
 // seçilenlerin ortanca yüksekliği hedef olur, her parçanın seviyesi buna göre ayarlanır.
 function clipRms(clip) {
@@ -1895,6 +2004,7 @@ let scrubbing = false;   // oynatma çizgisi fareyle sürükleniyor
 function setLoop(from, to) {
   state.loop = to - from > 0.2 ? { from: Math.max(0, from), to } : null;
   updateLoopUI();
+  updateStatus();
 }
 
 function toggleLoop() {
@@ -2689,7 +2799,7 @@ function copySelected() {
   if (!chosen.length) return toast('Önce bir parça seç');
   state.clipboard = chosen.map((c) => ({
     srcId: c.srcId, name: c.name, track: c.track, start: c.start, offset: c.offset, dur: c.dur,
-    fadeIn: c.fadeIn, fadeOut: c.fadeOut, gain: c.gain, pan: c.pan, eqLow: c.eqLow, eqHigh: c.eqHigh, bassSwap: c.bassSwap, ...copyMixParams(c),
+    fadeIn: c.fadeIn, fadeOut: c.fadeOut, gain: c.gain, pan: c.pan, hue: c.hue, eqLow: c.eqLow, eqHigh: c.eqHigh, bassSwap: c.bassSwap, ...copyMixParams(c),
   }));
   toast(chosen.length > 1 ? `${chosen.length} parça kopyalandı` : 'Parça kopyalandı');
 }
@@ -2830,6 +2940,8 @@ function clipMenu(time, track) {
     { label: 'Şarkıları otomatik sırala ve karıştır…', run: automix },
     { label: 'Parçayı sıfırla…', disabled: !primary || isPristine(primary), run: () => el.insReset.click() },
     'sep',
+    { label: 'Yeniden adlandır…', hint: 'F2', disabled: !primary, run: () => beginRename(primary) },
+    'sep',
     { label: many ? 'Seçilenleri sil' : 'Sil', hint: '⌫', danger: true, run: deleteSelected },
   ];
 }
@@ -2838,6 +2950,7 @@ function laneMenu(time, track) {
   return [
     { label: 'Yapıştır', hint: '⌘V', disabled: !state.clipboard, run: () => pasteClips(time, track) },
     { label: 'Oynatma çizgisini buraya getir', run: () => goTo(time) },
+    { label: 'İşaretçi ekle', hint: 'M', run: () => addMarkerAt(time) },
     'sep',
     { label: 'Tümünü seç', hint: '⌘A', disabled: !state.clips.length, run: () => { setSelection(state.clips.map((c) => c.id)); syncSelectionUI(); } },
     { label: 'Şarkı ekle…', hint: '⌘O', run: pickAndAdd },
@@ -3228,6 +3341,7 @@ function serializeProject() {
     },
     audio, sources,
     clips: state.clips.map((c) => Object.fromEntries(PARAM_KEYS.map((k) => [k, c[k]]))),
+    markers: state.markers.map((m) => ({ t: m.t, name: m.name })),
   };
   return { data, blobs };
 }
@@ -3281,6 +3395,7 @@ async function saveProject(saveAs = false) {
   project.name = file.split('/').pop().replace(/\.harman$/, '');
   project.savedRev = rev;
   updateProjectUI();
+  window.harman.recentAdd(file).catch(() => {});
   window.harman.autosaveClear().catch(() => {});
   project.autosavedRev = rev;
   toast(`Kaydedildi: ${project.name}`);
@@ -3369,6 +3484,7 @@ async function loadProject(data, dir, { path = null, name = null, dirty = false 
   tempo.forClip = null;
   state.nextId = 1;
   state.loop = null;
+  state.markers = [];
 
   const idMap = new Map();
   for (const s of data.sources) idMap.set(s.id, state.nextId++);
@@ -3412,6 +3528,7 @@ async function loadProject(data, dir, { path = null, name = null, dirty = false 
   }
   for (const [id, src] of state.sources) if (src.analysis !== 'done') queueAnalysis(id);
 
+  state.markers = (data.markers || []).map((m) => ({ id: state.nextId++, t: m.t, name: m.name }));
   const v = data.view || {};
   state.trackOn = (v.trackOn || [true, true, true, true]).slice(0, TRACK_COUNT);
   trackChecks.forEach((c, i) => c.setAttribute('aria-checked', String(state.trackOn[i])));
@@ -3451,6 +3568,7 @@ async function openProjectFile(file, opts = {}) {
   const ok = await runBusy('Proje açılıyor', async () => {
     notes = await loadProject(data, dir, opts.keep ?? { path: file, name: file.split('/').pop().replace(/\.harman$/, '') });
   });
+  if (ok && project.path) window.harman.recentAdd(project.path).catch(() => {});
   if (ok) toast(notes.length ? `Proje açıldı, ama ${notes.join('; ')}` : `Proje açıldı: ${project.name || 'Adsız proje'}`, notes.length > 0);
   return ok;
 }
@@ -3463,6 +3581,13 @@ async function confirmDiscard(action) {
   if (choice === 'save') return saveProject();
   return true;
 }
+
+// Verilen yoldaki projeyi açar (Son Açılanlar menüsü, Dock'a bırakma, çift tıklama).
+async function openProjectPath(file) {
+  if (!file || !(await confirmDiscard('açarken'))) return;
+  try { await openProjectFile(file); } catch (err) { toast(`Proje açılamadı: ${friendly(err.message)}`, true); }
+}
+window.harman.onOpenProject(openProjectPath);
 
 async function projectOpen() {
   const file = await window.harman.projectOpenDialog();
@@ -3487,6 +3612,7 @@ async function projectNew() {
   state.playhead = 0;
   state.marker = 0;
   state.loop = null;
+  state.markers = [];
   project.path = null;
   project.name = null;
   project.written = new Map();
@@ -3548,11 +3674,13 @@ const actions = {
   delete: deleteSelected,
   play: togglePlay,
   loop: toggleLoop,
+  'marker-add': () => addMarkerAt(state.playhead),
+  'open-recent': (file) => openProjectPath(file),
   'step-back': () => movePlayhead(state.playhead - fineStep()),
   'step-forward': () => movePlayhead(state.playhead + fineStep()),
   'edge-back': () => jumpToEdge(-1),
   'edge-forward': () => jumpToEdge(1),
-  'snap-beats': (value) => { state.snapBeats = value ?? !state.snapBeats; toast(state.snapBeats ? 'Vuruşa yapışma açık' : 'Vuruşa yapışma kapalı'); },
+  'snap-beats': (value) => { state.snapBeats = value ?? !state.snapBeats; updateStatus(); toast(state.snapBeats ? 'Vuruşa yapışma açık' : 'Vuruşa yapışma kapalı'); },
   automix,
   start: () => { goTo(0); el.timeline.scrollLeft = 0; },
   end: () => goTo(projectEnd()),
@@ -3722,7 +3850,107 @@ function startScrub(e) {
   window.addEventListener('pointerup', up);
 }
 
-el.ruler.addEventListener('pointerdown', startScrub);
+// ---------------------------------------------------------------- işaretçiler
+// M: oynatma çizgisine isimli bir nokta koyar ("nakarat", "drop"). Tıkla: oraya git. Sürükle: taşı.
+// Çift tıkla ya da sağ tık: yeniden adlandır / sil. ⌥ + ← / → işaretçilere de atlar. Geri alınabilir.
+function addMarkerAt(t) {
+  if (state.markers.some((m) => Math.abs(m.t - t) < 0.05)) return toast('Bu noktada zaten bir işaretçi var');
+  let created = null;
+  mutate(() => {
+    created = { id: state.nextId++, t: Math.max(0, t), name: `İşaret ${state.markers.length + 1}` };
+    state.markers.push(created);
+  });
+  drawRuler();
+  updateProjectUI();
+  beginMarkerRename(created);
+}
+
+function removeMarker(id) {
+  mutate(() => { state.markers = state.markers.filter((m) => m.id !== id); });
+  drawRuler();
+}
+
+function beginMarkerRename(m) {
+  const hit = markerHits.find((h) => h.id === m.id);
+  if (!hit) return;
+  el.ruler.querySelector('.marker-rename')?.remove();
+  const input = document.createElement('input');
+  input.className = 'marker-rename';
+  input.type = 'text';
+  input.value = m.name;
+  input.maxLength = 60;
+  input.setAttribute('aria-label', 'İşaretçi adı');
+  input.style.setProperty('left', `${Math.max(GUTTER, hit.x0 + 3)}px`);
+  input.addEventListener('pointerdown', (e) => e.stopPropagation());
+  let done = false;
+  const finish = (commit) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    input.remove();
+    if (commit && name && name !== m.name) { mutate(() => { m.name = name; }); drawRuler(); }
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  el.ruler.appendChild(input);
+  input.focus();
+  input.select();
+}
+
+const markerAtEvent = (e) => {
+  const r = el.ruler.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+  const hit = markerHits.find((h) => x >= h.x0 && x <= h.x1 && y >= h.y0);
+  return hit ? state.markers.find((m) => m.id === hit.id) : null;
+};
+
+function startMarkerDrag(e, m) {
+  const x0 = e.clientX;
+  let moved = false;
+  beginEdit();
+  const move = (ev) => {
+    if (!moved && Math.abs(ev.clientX - x0) < 4) return;
+    if (ev.buttons === 0) return;
+    moved = true;
+    m.t = timeAt(ev.clientX);
+    drawRuler();
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    endEdit();
+    updateProjectUI();
+    if (!moved) goTo(m.t);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+el.ruler.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  const m = markerAtEvent(e);
+  if (m) { e.preventDefault(); startMarkerDrag(e, m); } else startScrub(e);
+});
+el.ruler.addEventListener('dblclick', (e) => { const m = markerAtEvent(e); if (m) beginMarkerRename(m); });
+el.ruler.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  const m = markerAtEvent(e);
+  const t = timeAt(e.clientX);
+  showContextMenu(e.clientX, e.clientY, m
+    ? [
+      { label: 'Yeniden adlandır…', run: () => beginMarkerRename(m) },
+      { label: 'Oynatma çizgisini buraya getir', run: () => goTo(m.t) },
+      'sep',
+      { label: 'İşaretçiyi sil', danger: true, run: () => removeMarker(m.id) },
+    ]
+    : [{ label: 'İşaretçi ekle', hint: 'M', run: () => addMarkerAt(t) }]);
+});
 
 el.tracks.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 || e.ctrlKey || e.target.closest('.clip') || e.target.closest('.track-label')) return;
@@ -3761,11 +3989,26 @@ const fineStep = () => Math.max(0.005, 8 / state.pps);
 function jumpToEdge(dir) {
   const points = [0, projectEnd()];
   for (const c of state.clips) points.push(c.start, clipEnd(c));
+  for (const m of state.markers) points.push(m.t);
   const t = state.playhead;
   const sorted = [...new Set(points.map((v) => Math.round(v * 1000) / 1000))].sort((a, b) => a - b);
   const target = dir > 0 ? sorted.find((v) => v > t + 0.002) : [...sorted].reverse().find((v) => v < t - 0.002);
   if (target === undefined) return toast(dir > 0 ? 'Sonda' : 'Başta');
   movePlayhead(target);
+}
+
+// ⌥ + ↑ / ↓: seçili parçaları bir hat yukarı / aşağı taşır (hiçbiri dışarı taşmaz).
+function moveSelectionTrack(dir) {
+  const chosen = selectedClips();
+  if (!chosen.length) return toast('Önce bir parça seç');
+  const tracks = chosen.map((c) => c.track);
+  const shift = clamp(dir, -Math.min(...tracks), TRACK_COUNT - 1 - Math.max(...tracks));
+  if (!shift) return toast(dir < 0 ? 'Zaten en üst hatta' : 'Zaten en alt hatta');
+  mutate(() => {
+    for (const c of chosen) { c.track += shift; laneOf(c.track).appendChild(c.el); }
+  });
+  layoutAll();
+  onEdited();
 }
 
 function revealPlayhead() {
@@ -3820,6 +4063,11 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' || e.key === 'Enter') target.blur();
     return;
   }
+  if (e.altKey && !e.metaKey && !e.ctrlKey && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
+    e.preventDefault();
+    moveSelectionTrack(e.code === 'ArrowUp' ? -1 : 1);
+    return;
+  }
   // ⌘ + ← / →: ince adım. ⌥ + ← / →: parça kenarlarına atla. (Normal ok tuşları: 1 sn, ⇧ ile 5 sn.)
   if ((e.metaKey || e.altKey) && !e.ctrlKey && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
     e.preventDefault();
@@ -3853,6 +4101,8 @@ document.addEventListener('keydown', (e) => {
     case 'Space': e.preventDefault(); document.activeElement?.blur(); (e.shiftKey ? resumePlay() : togglePlay()); break;
     case 'KeyS': splitSelected(); break;
     case 'KeyL': toggleLoop(); break;
+    case 'F2': e.preventDefault(); beginRename(selected()); break;
+    case 'KeyM': addMarkerAt(state.playhead); break;
     case 'KeyQ': case 'BracketLeft': trimToPlayhead('start'); break;
     case 'KeyW': case 'BracketRight': trimToPlayhead('end'); break;
     case 'Delete': case 'Backspace': deleteSelected(); break;
@@ -3870,7 +4120,8 @@ buildTracks();
 offerRestore().then(() => {
   let seen = false;
   try { seen = !!localStorage.getItem('harman.welcomed'); } catch { /* özel pencere */ }
-  if (!seen && !state.clips.length) startTour();
+  window.harman.takePendingOpen().then((file) => { if (file) openProjectPath(file); });
+  if (!seen && !state.clips.length && !project.path) startTour();
 });
 [el.insGain, el.insFadeIn, el.insFadeOut].forEach(paintSlider);
 layoutAll();

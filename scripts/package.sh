@@ -30,6 +30,7 @@ fi
   --platform=darwin --arch=arm64 --out="$OUT" --overwrite \
   --icon=build/icon.icns \
   --ignore='^/(dist|dist-next|dist-dmg|assets|test|scripts|build/icon-1024\.png|\.gitignore|README\.md)' \
+  --extend-info=scripts/Info-extra.plist \
   --app-bundle-id=com.harman.app
 
 if [ "$RUNNING" = 1 ]; then
