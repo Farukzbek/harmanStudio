@@ -27,6 +27,11 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Bir parçayı diğerinin tempoyuna ve tonuna getir (Rubber Band ile), vuruşları hizala
 - Akıllı geçiş önerileri: iki parça için en iyi 3 geçişi önerir ve tek tıkla uygular
 
+**Projeler ve güvenlik**
+- Projeyi kaydet / aç (`.harman`, ⌘S / ⌥⌘O): tüm parçalar, ayarlar, zamanlı geçişler, tempo/ton değişiklikleri ve ayrılmış sesler olduğu gibi geri gelir; açınca yeniden ayırmak veya işlemek gerekmez. Orijinal şarkılar kopyalanmaz, yolla bağlanır; taşınmışsa açılışta yeni konumu göstermeni ister
+- Otomatik yedek: değişiklik oldukça 15 saniyede bir arka planda yazılır. Uygulama çökerse ya da kapanırsa bir sonraki açılışta "geri yüklensin mi?" diye sorar
+- Kaydedilmemiş değişiklik varken pencereyi kapatırsan (ya da ⌘Q) Kaydet / Kaydetme / Vazgeç diye sorar
+
 **Çıktı**
 - MP3 (320 kbps) veya WAV; biçim kaydetme penceresindeki dosya türünden seçilir
 - İsteğe bağlı normalize: mix'in en yüksek ses tepesini −1 dB'e ayarlar
@@ -135,6 +140,8 @@ Uygulama içinde `⌘/` ile tam liste açılır.
 | ⌫ | Parçayı sil |
 | ⌘Z / ⇧⌘Z | Geri al / yinele |
 | ⌘O / ⌘E | Şarkı ekle / mix'i kaydet |
+| ⌘S / ⌥⌘S | Projeyi kaydet / farklı kaydet |
+| ⌥⌘O / ⌘N | Proje aç / yeni proje |
 | ⌥ + kaydır | Parmaklar yukarı yakınlaştırır, aşağı uzaklaştırır (imlecin olduğu yerde) |
 | Trackpad'de sıkıştır | Yakınlaştır / uzaklaştır |
 | ⌃ + kaydır, ⇧ + kaydır | Sağa sola git |
@@ -153,6 +160,7 @@ src/engine.js          Vokal / enstrüman ayırma motoru (Python yan servisi) y�
 src/tempo.js           Tempo / ton aracı (Rubber Band) yönetimi
 src/pyenv.js           Python ortamı kurma ve süreç çalıştırma yardımcıları
 src/saveformat.js      Kaydetme yolundan biçim çıkarma
+src/projectfile.js     Proje dosyası ve yan ses dosyaları için güvenli (geçici dosya + yeniden adlandırma) yazma
 src/renderer/          Arayüz: index.html, style.css, app.js (zaman çizelgesi, ses motoru), analysis.js (BPM / ton / enerji), transitions.js (geçiş önerileri)
 tools/separate.py      Ayırma motorunu bellek sınırıyla başlatır
 tools/stretch.py       Tempo / ton değiştirme (pedalboard / Rubber Band)

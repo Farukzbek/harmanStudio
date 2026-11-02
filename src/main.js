@@ -5,6 +5,7 @@ const os = require('os');
 const path = require('path');
 const engine = require('./engine');
 const tempo = require('./tempo');
+const projectFile = require('./projectfile');
 
 app.setName('Harman');
 
@@ -44,7 +45,20 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  // Kaydedilmemiş çalışma varsa pencere hemen kapanmaz: arayüz sorar (Kaydet / Kaydetme / Vazgeç).
+  // Sayfa yüklenmediyse ya da çöktüyse kapatmayı engellemeyiz.
+  win.on('close', (e) => {
+    if (win.forceClose || win.webContents.isLoading() || win.webContents.isCrashed()) return;
+    e.preventDefault();
+    win.quitRequested = quitting;
+    quitting = false;
+    win.webContents.send('close-request');
+  });
 }
+
+let quitting = false;
+app.on('before-quit', () => { quitting = true; });
 
 // Menü; tıklamalar arayüze "menu" olayı olarak gider. registerAccelerator:false olanlar
 // yalnızca kısayolu göstermek içindir, tuşu arayüz kendisi dinler.
@@ -70,6 +84,11 @@ function buildMenu() {
     {
       label: 'Dosya',
       submenu: [
+        item('Yeni Proje', 'project-new', 'CmdOrCtrl+N'),
+        item('Proje Aç…', 'project-open', 'Alt+CmdOrCtrl+O'),
+        item('Projeyi Kaydet', 'project-save', 'CmdOrCtrl+S'),
+        item('Projeyi Farklı Kaydet…', 'project-save-as', 'Alt+CmdOrCtrl+S'),
+        sep,
         item('Şarkı Ekle…', 'add', 'CmdOrCtrl+O'),
         item('Mix\'i Kaydet…', 'export', 'CmdOrCtrl+E'),
         sep,
@@ -205,6 +224,100 @@ ipcMain.handle('stretch', (_e, args) => tempo.stretch(args));
 ipcMain.handle('write-temp-wav', (_e, wav) => tempo.writeTempWav(wav));
 ipcMain.handle('cleanup-dir', (_e, dir) => engine.cleanup(dir));
 app.on('before-quit', () => engine.cancel());
+
+// ---------------------------------------------------------------- proje dosyaları
+const projectFilters = [{ name: 'Harman projesi', extensions: ['harman'] }];
+const projectsDir = () => path.join(app.getPath('documents'), 'Harman Projeleri');
+const autosaveDir = () => path.join(app.getPath('userData'), 'autosave');
+const autosaveFile = () => path.join(autosaveDir(), 'project.json');
+const winOf = (e) => BrowserWindow.fromWebContents(e.sender);
+
+ipcMain.handle('project-save-dialog', async (e, defaultName) => {
+  await fs.promises.mkdir(projectsDir(), { recursive: true });
+  const { canceled, filePath } = await dialog.showSaveDialog(winOf(e), {
+    title: 'Projeyi kaydet',
+    defaultPath: path.join(projectsDir(), `${defaultName}.harman`),
+    filters: projectFilters,
+  });
+  if (canceled || !filePath) return null;
+  return filePath.endsWith('.harman') ? filePath : `${filePath}.harman`;
+});
+ipcMain.handle('project-open-dialog', async (e) => {
+  await fs.promises.mkdir(projectsDir(), { recursive: true });
+  const { canceled, filePaths } = await dialog.showOpenDialog(winOf(e), {
+    title: 'Proje aç',
+    defaultPath: projectsDir(),
+    properties: ['openFile'],
+    filters: projectFilters,
+  });
+  return canceled ? null : filePaths[0];
+});
+ipcMain.handle('project-data-dir', (_e, projectPath) => projectFile.dataDirOf(projectPath));
+ipcMain.handle('project-write-json', (_e, { file, text }) => projectFile.writeAtomic(file, text));
+ipcMain.handle('project-read-json', (_e, file) => fs.promises.readFile(file, 'utf8'));
+ipcMain.handle('project-write-blob', (_e, { dir, rel, bytes }) => projectFile.writeBlob(dir, rel, bytes));
+ipcMain.handle('project-read-blob', (_e, { dir, rel }) => projectFile.readBlob(dir, rel));
+ipcMain.handle('project-has-blob', (_e, { dir, rel }) => projectFile.exists(dir, rel));
+ipcMain.handle('project-prune', (_e, { dir, keep }) => projectFile.prune(dir, keep));
+
+// Otomatik yedek: çalışma sürerken düzenli yazılır; temiz kapanışta ya da kayıttan sonra silinir.
+ipcMain.handle('autosave-paths', () => ({ dir: autosaveDir(), file: autosaveFile() }));
+ipcMain.handle('autosave-peek', async () => {
+  try { return await fs.promises.readFile(autosaveFile(), 'utf8'); } catch { return null; }
+});
+ipcMain.handle('autosave-clear', () => fs.promises.rm(autosaveDir(), { recursive: true, force: true }));
+
+// Dosyası bulunamayan şarkı için yeni konum seçtirir.
+ipcMain.handle('locate-file', async (e, name) => {
+  const { response } = await dialog.showMessageBox(winOf(e), {
+    type: 'warning',
+    message: `"${name}" bulunamadı`,
+    detail: 'Dosya taşınmış ya da silinmiş olabilir. Yeni konumunu gösterirsen proje onunla devam eder.',
+    buttons: ['Dosyayı Göster…', 'Bu Parçayı Atla'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response !== 0) return null;
+  const { canceled, filePaths } = await dialog.showOpenDialog(winOf(e), {
+    title: `"${name}" dosyasını göster`,
+    properties: ['openFile'],
+    filters: [{ name: 'Ses dosyaları', extensions: AUDIO_EXTS }],
+  });
+  return canceled ? null : filePaths[0];
+});
+
+ipcMain.handle('confirm-unsaved', async (e, { name, action }) => {
+  const { response } = await dialog.showMessageBox(winOf(e), {
+    type: 'warning',
+    message: `"${name}" projesindeki değişiklikler kaydedilsin mi?`,
+    detail: `Kaydetmezsen ${action} sırasında yapılan değişiklikler kaybolur.`,
+    buttons: ['Kaydet', 'Kaydetme', 'Vazgeç'],
+    defaultId: 0,
+    cancelId: 2,
+  });
+  return ['save', 'discard', 'cancel'][response];
+});
+ipcMain.handle('confirm-restore', async (e, info) => {
+  const { response } = await dialog.showMessageBox(winOf(e), {
+    type: 'question',
+    message: 'Önceki oturumdan kaydedilmemiş bir çalışma bulundu',
+    detail: `${info}\n\nGeri yüklemek ister misin?`,
+    buttons: ['Geri Yükle', 'Sil'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  return response === 0;
+});
+ipcMain.handle('close-window', (e, ok) => {
+  const win = winOf(e);
+  if (!win) return;
+  if (!ok) { win.quitRequested = false; return; }
+  win.forceClose = true;
+  const quit = win.quitRequested;
+  win.close();
+  if (quit) app.quit();
+});
+ipcMain.handle('set-title', (e, title) => winOf(e)?.setTitle(title));
 
 app.whenReady().then(() => {
   // Geliştirme modunda Dock'ta da Harman ikonu görünsün.
