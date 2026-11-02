@@ -147,6 +147,10 @@ function buildMenu() {
       submenu: [
         item('Oynat / Duraklat', 'play', 'Space', display),
         item('Seçili Parçayı Döngüde Dinle', 'loop', 'L', display),
+        item('İnce Adım Geri', 'step-back', 'CmdOrCtrl+Left', display),
+        item('İnce Adım İleri', 'step-forward', 'CmdOrCtrl+Right', display),
+        item('Önceki Parça Kenarı', 'edge-back', 'Alt+Left', display),
+        item('Sonraki Parça Kenarı', 'edge-forward', 'Alt+Right', display),
         item('Başa Dön', 'start', 'Return', display),
         item('Sona Git', 'end', 'End', display),
       ],

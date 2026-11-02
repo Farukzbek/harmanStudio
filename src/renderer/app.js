@@ -3548,6 +3548,10 @@ const actions = {
   delete: deleteSelected,
   play: togglePlay,
   loop: toggleLoop,
+  'step-back': () => movePlayhead(state.playhead - fineStep()),
+  'step-forward': () => movePlayhead(state.playhead + fineStep()),
+  'edge-back': () => jumpToEdge(-1),
+  'edge-forward': () => jumpToEdge(1),
   'snap-beats': (value) => { state.snapBeats = value ?? !state.snapBeats; toast(state.snapBeats ? 'Vuruşa yapışma açık' : 'Vuruşa yapışma kapalı'); },
   automix,
   start: () => { goTo(0); el.timeline.scrollLeft = 0; },
@@ -3732,6 +3736,38 @@ function parseTime(text) {
   const m = /^(?:(\d+):)?(\d+(?:\.\d+)?)$/.exec(t);
   return m ? Number(m[1] || 0) * 60 + Number(m[2]) : null;
 }
+// Ok tuşlarıyla gezinirken çizgi görünümden çıkarsa görünüm bir "sayfa" kayar: çizgi ileri giderken
+// sol kenara yakın, geri giderken sağ kenara yakın bir yerde belirir.
+function pageFollow() {
+  const view = el.timeline;
+  const x = GUTTER + state.playhead * state.pps;
+  const page = view.clientWidth - GUTTER;
+  if (x > view.scrollLeft + view.clientWidth - 24) view.scrollLeft = Math.max(0, x - GUTTER - page * 0.12);
+  else if (x < view.scrollLeft + GUTTER) view.scrollLeft = Math.max(0, x - GUTTER - page * 0.88);
+  updatePlayheadUI();
+}
+
+// Oynatma çizgisini hareket ettirir (çalıyorsa kaldığı yerden devam eder) ve görünümü takip ettirir.
+function movePlayhead(t) {
+  goTo(Math.max(0, t));
+  pageFollow();
+}
+
+// ⌘ + ok: ince adım. Adım yakınlığa göre ayarlanır (yaklaşık 8 piksel): uzaklaşınca büyür, çok yaklaşınca
+// birkaç milisaniyeye iner. ⇧ ile 5 kat.
+const fineStep = () => Math.max(0.005, 8 / state.pps);
+
+// ⌥ + ok: önceki / sonraki parça kenarı (başlangıç ya da bitiş).
+function jumpToEdge(dir) {
+  const points = [0, projectEnd()];
+  for (const c of state.clips) points.push(c.start, clipEnd(c));
+  const t = state.playhead;
+  const sorted = [...new Set(points.map((v) => Math.round(v * 1000) / 1000))].sort((a, b) => a - b);
+  const target = dir > 0 ? sorted.find((v) => v > t + 0.002) : [...sorted].reverse().find((v) => v < t - 0.002);
+  if (target === undefined) return toast(dir > 0 ? 'Sonda' : 'Başta');
+  movePlayhead(target);
+}
+
 function revealPlayhead() {
   const view = el.timeline;
   const x = GUTTER + state.playhead * state.pps;
@@ -3784,6 +3820,14 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' || e.key === 'Enter') target.blur();
     return;
   }
+  // ⌘ + ← / →: ince adım. ⌥ + ← / →: parça kenarlarına atla. (Normal ok tuşları: 1 sn, ⇧ ile 5 sn.)
+  if ((e.metaKey || e.altKey) && !e.ctrlKey && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+    e.preventDefault();
+    const dir = e.code === 'ArrowRight' ? 1 : -1;
+    if (e.metaKey) movePlayhead(state.playhead + dir * fineStep() * (e.shiftKey ? 5 : 1));
+    else jumpToEdge(dir);
+    return;
+  }
   if ((e.metaKey || e.ctrlKey) && ['KeyC', 'KeyX', 'KeyV'].includes(e.code)) {
     e.preventDefault();
     ({ KeyC: copySelected, KeyX: cutSelected, KeyV: () => pasteClips() })[e.code]();
@@ -3814,8 +3858,8 @@ document.addEventListener('keydown', (e) => {
     case 'Delete': case 'Backspace': deleteSelected(); break;
     case 'Enter': case 'NumpadEnter': case 'Home': actions.start(); break;
     case 'End': actions.end(); break;
-    case 'ArrowLeft': if (!typing) { e.preventDefault(); goTo(state.playhead - step); } break;
-    case 'ArrowRight': if (!typing) { e.preventDefault(); goTo(state.playhead + step); } break;
+    case 'ArrowLeft': if (!typing) { e.preventDefault(); movePlayhead(state.playhead - step); } break;
+    case 'ArrowRight': if (!typing) { e.preventDefault(); movePlayhead(state.playhead + step); } break;
     case 'Escape': document.activeElement?.blur(); select(null); break;
     default:
   }

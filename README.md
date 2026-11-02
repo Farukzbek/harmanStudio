@@ -177,6 +177,9 @@ Uygulama içinde `⌘/` ile tam liste açılır.
 | ⌫ | Parçayı sil |
 | ⌘Z / ⇧⌘Z | Geri al / yinele |
 | ⌘O / ⌘E | Şarkı ekle / mix'i kaydet |
+| ← / → | 1 sn geri / ileri (⇧ ile 5 sn). Çizgi ekran dışına çıkarsa görünüm bir sayfa kayar |
+| ⌘ + ← / → | İnce adım: yakınlığa göre yaklaşık 8 piksel (⇧ ile 5 kat) |
+| ⌥ + ← / → | Önceki / sonraki parça kenarına atla |
 | L | Seçili parçayı döngüde dinle (tekrar L: kapat) |
 | ⌘S / ⌥⌘S | Projeyi kaydet / farklı kaydet |
 | ⌥⌘O / ⌘N | Proje aç / yeni proje |
