@@ -201,6 +201,16 @@
               <button id="match-reset" class="btn solid wide" hidden>Orijinal tempo ve tona dön</button>
 
               <div class="trans">
+                <div class="seg-row tpl-row">
+                  <span>Şablon</span>
+                  <select id="trans-template" aria-label="Geçiş şablonu"></select>
+                  <button id="trans-template-save" class="icon-btn tiny" title="Mevcut geçiş ayarlarını şablon olarak kaydet">+</button>
+                  <button id="trans-template-del" class="icon-btn tiny" title="Seçili şablonu sil" hidden>×</button>
+                </div>
+                <div id="trans-template-form" class="tpl-form" hidden>
+                  <input id="trans-template-name" type="text" maxlength="40" placeholder="Şablon adı" aria-label="Şablon adı" autocomplete="off" spellcheck="false">
+                  <button id="trans-template-ok" class="btn solid mini">Kaydet</button>
+                </div>
                 <div class="match-line">
                   <button id="trans-bass" class="switch" role="switch" aria-checked="true" aria-label="Bas takası"><i></i></button>
                   <span title="Geçişin ortasında çıkan parçanın basını kısar, giren parçanın basını açar">Bas takası (DJ geçişi)</span>

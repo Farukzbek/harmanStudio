@@ -78,7 +78,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -3216,6 +3216,98 @@ async function automix() {
 }
 
 el.transFind.addEventListener('click', findTransitions);
+
+// Geçiş şablonları: uzunluk (vuruş), bas takası, tempo ve ton eşitleme ayarlarını bir isimle saklar.
+// Hazır şablonlar sabittir; kendi şablonların bu bilgisayarda saklanır.
+const BUILTIN_TEMPLATES = [
+  { name: 'Dengeli', fadeBeats: 16, bassSwap: true, doTempo: true, doKey: true },
+  { name: 'Uzun ve yumuşak', fadeBeats: 32, bassSwap: true, doTempo: true, doKey: true },
+  { name: 'Hızlı kesme', fadeBeats: 8, bassSwap: false, doTempo: true, doKey: true },
+  { name: 'Sadece karıştır (tempo/ton değişmez)', fadeBeats: 16, bassSwap: true, doTempo: false, doKey: false },
+];
+const readUserTemplates = () => {
+  try {
+    const list = JSON.parse(localStorage.getItem('harman.transTemplates') || '[]');
+    return Array.isArray(list) ? list.filter((t) => t && typeof t.name === 'string') : [];
+  } catch { return []; }
+};
+const writeUserTemplates = (list) => { try { localStorage.setItem('harman.transTemplates', JSON.stringify(list)); } catch { /* özel pencere */ } };
+
+function renderTemplateOptions(selectName = '') {
+  const sel = el.transTemplate;
+  sel.replaceChildren();
+  const add = (parent, t, key) => { const o = document.createElement('option'); o.value = key; o.textContent = t.name; parent.appendChild(o); };
+  const ph = document.createElement('option');
+  ph.value = '';
+  ph.textContent = 'Seç…';
+  sel.appendChild(ph);
+  const b = document.createElement('optgroup');
+  b.label = 'Hazır';
+  BUILTIN_TEMPLATES.forEach((t, i) => add(b, t, `b:${i}`));
+  sel.appendChild(b);
+  const mine = readUserTemplates();
+  if (mine.length) {
+    const u = document.createElement('optgroup');
+    u.label = 'Benim şablonlarım';
+    mine.forEach((t, i) => add(u, t, `u:${i}`));
+    sel.appendChild(u);
+  }
+  sel.value = selectName;
+  el.tplDel.hidden = !sel.value.startsWith('u:');
+}
+
+function currentTemplateSettings() {
+  return { fadeBeats: tempo.fadeBeats, bassSwap: tempo.bassSwap, doTempo: tempo.doTempo, doKey: tempo.doKey };
+}
+
+function applyTemplate(t) {
+  tempo.fadeBeats = t.fadeBeats;
+  tempo.bassSwap = !!t.bassSwap;
+  tempo.doTempo = !!t.doTempo;
+  tempo.doKey = !!t.doKey;
+  el.transBeats.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.beats) === tempo.fadeBeats)));
+  el.transBass.setAttribute('aria-checked', String(tempo.bassSwap));
+  updateInspector();
+  if (el.transList.children.length) findTransitions();
+  toast(`Şablon uygulandı: ${t.name}`);
+}
+
+el.transTemplate.addEventListener('change', () => {
+  const [kind, idx] = el.transTemplate.value.split(':');
+  const t = kind === 'b' ? BUILTIN_TEMPLATES[Number(idx)] : kind === 'u' ? readUserTemplates()[Number(idx)] : null;
+  el.tplDel.hidden = kind !== 'u';
+  if (t) applyTemplate(t);
+});
+el.tplSave.addEventListener('click', () => {
+  el.tplForm.hidden = !el.tplForm.hidden;
+  if (!el.tplForm.hidden) { el.tplName.value = ''; el.tplName.focus(); }
+});
+const saveTemplate = () => {
+  const name = el.tplName.value.trim();
+  if (!name) return toast('Şablona bir ad ver');
+  const list = readUserTemplates().filter((t) => t.name !== name);
+  list.push({ name, ...currentTemplateSettings() });
+  writeUserTemplates(list);
+  el.tplForm.hidden = true;
+  renderTemplateOptions(`u:${list.length - 1}`);
+  toast(`Şablon kaydedildi: ${name}`);
+};
+el.tplOk.addEventListener('click', saveTemplate);
+el.tplName.addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { e.preventDefault(); saveTemplate(); }
+  else if (e.key === 'Escape') { e.preventDefault(); el.tplForm.hidden = true; }
+});
+el.tplDel.addEventListener('click', () => {
+  const [kind, idx] = el.transTemplate.value.split(':');
+  if (kind !== 'u') return;
+  const list = readUserTemplates();
+  const [gone] = list.splice(Number(idx), 1);
+  writeUserTemplates(list);
+  renderTemplateOptions('');
+  toast(`Şablon silindi: ${gone?.name ?? ''}`);
+});
+renderTemplateOptions();
 el.transBeats.addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-beats]');
   if (!btn) return;

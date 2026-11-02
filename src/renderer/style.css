@@ -894,3 +894,8 @@ input[type="range"]:disabled { opacity: 0.45; }
 .clip-flag { margin-left: auto; margin-right: 6px; font: 600 8.5px var(--mono); letter-spacing: 0.4px; color: #fff; }
 .clip-flag:empty { display: none; }
 .clip.soloed { box-shadow: 0 0 0 1.5px #ffd166; }
+
+/* geçiş şablonları */
+.tpl-row select { flex: 1; min-width: 0; height: 26px; padding: 0 4px 0 6px; }
+.tpl-form { display: flex; gap: 6px; margin: -2px 0 8px; }
+.tpl-form input { flex: 1; min-width: 0; height: 26px; }
