@@ -4,6 +4,8 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 
 > Durum: v0.1, erken sürüm. Şu an yalnızca macOS (Apple Silicon) hedeflenir.
 
+**English:** Harman is a simple, free, ad-free, open-source music mixing app for macOS (Apple Silicon). Import songs, cut and merge them on a 4-lane timeline, fade and crossfade, separate vocals and instruments, match tempo and key, get smart transition suggestions, save projects with automatic backup, and export as MP3 or WAV. The interface and this documentation are in Turkish. To try it: `npm install && npm start` (requires Node.js 18+, and `ffmpeg` for MP3 export). Code is MIT licensed.
+
 ## Özellikler
 
 **Düzenleme**
