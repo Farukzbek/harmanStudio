@@ -3334,10 +3334,17 @@ function transitionCost(a, b) {
   return pct * 0.6 + semis * 1.2;
 }
 
-function planOrder(clips) {
+// Sıra açgözlü kurulur: seçilen ilk şarkıdan başlar, her adımda tempoca ve tonca en yakın kalan gelir.
+// maxCost: bundan uyumsuz bir sonraki şarkı kalırsa dizilim durur (kalanlar atlanır).
+// targetSec: tahmini toplam süre buna ulaşınca durur (0 = hepsi).
+function planOrder(clips, { start = null, maxCost = Infinity, targetSec = 0 } = {}) {
   const rest = [...clips].sort((x, y) => x.start - y.start);
-  const order = [rest.shift()];
+  const first = rest.splice(Math.max(0, rest.findIndex((c) => c.id === start)), 1)[0];
+  const order = [first];
+  let total = first.dur * 0.8;
+  const skipped = [];
   while (rest.length) {
+    if (targetSec > 0 && total >= targetSec && order.length >= 2) break;      // en az iki şarkı olmadan karışım olmaz
     const cur = sourceOf(order[order.length - 1]);
     let best = 0;
     let bestCost = Infinity;
@@ -3345,23 +3352,106 @@ function planOrder(clips) {
       const cost = transitionCost(cur, sourceOf(c));
       if (cost < bestCost) { bestCost = cost; best = i; }
     });
-    order.push(rest.splice(best, 1)[0]);
+    if (bestCost > maxCost) break;
+    const next = rest.splice(best, 1)[0];
+    order.push(next);
+    total += next.dur * 0.8;
   }
-  return order;
+  skipped.push(...rest);
+  return { order, skipped, estimate: total };
+}
+
+// Seçim penceresi: dahil edilecek şarkılar, ilk şarkı, uyumsuzları atlama ve hedef süre. Seçilen sırayı döndürür.
+function chooseAutomix(clips) {
+  return new Promise((resolve) => {
+    const dlg = $('automix');
+    const songs = $('am-songs');
+    const sorted = [...clips].sort((a, b) => a.start - b.start);
+    const rows = sorted.map((c) => {
+      const row = document.createElement('label');
+      row.className = 'am-row';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'am-start';
+      radio.title = 'İlk çalacak şarkı';
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.checked = true;
+      check.title = 'Karışıma dahil et';
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = c.name;
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = tagText(c);
+      row.append(radio, check, nm, meta);
+      return { clip: c, radio, check, row };
+    });
+    rows[0].radio.checked = true;
+    const head = document.createElement('div');
+    head.className = 'am-head';
+    head.innerHTML = '<span title="İlk şarkı">İlk</span><span title="Dahil">✓</span><span>Şarkı</span>';
+    songs.replaceChildren(head, ...rows.map((r) => r.row));
+
+    const compute = () => {
+      const chosen = rows.filter((r) => r.check.checked).map((r) => r.clip);
+      const startRow = rows.find((r) => r.radio.checked);
+      let start = startRow && startRow.check.checked ? startRow.clip.id : chosen[0]?.id;
+      if (chosen.length < 2) return { plan: null, chosen };
+      const plan = planOrder(chosen, { start, maxCost: $('am-skip').checked ? 14 : Infinity, targetSec: Number($('am-dur').value || 0) * 60 });
+      return { plan, chosen };
+    };
+    const refresh = () => {
+      const { plan, chosen } = compute();
+      const go = $('am-go');
+      if (!plan) { $('am-preview').textContent = chosen.length < 2 ? 'Karıştırmak için en az iki şarkı seç.' : ''; go.disabled = true; return; }
+      go.disabled = false;
+      const lines = plan.order.map((c, i) => `${i + 1}. ${c.name}`);
+      const est = Math.round(plan.estimate / 60);
+      $('am-preview').textContent = `Sıra (yaklaşık ${est} dk):\n${lines.join('\n')}${plan.skipped.length ? `\nAtlanan: ${plan.skipped.map((c) => c.name).join(', ')}` : ''}`;
+    };
+    const finish = (result) => {
+      dlg.hidden = true;
+      cleanup();
+      resolve(result);
+    };
+    const onGo = () => { const { plan } = compute(); finish(plan ? plan.order : null); };
+    const onCancel = () => finish(null);
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onCancel(); } };
+    const onBackdrop = (e) => { if (e.target === dlg) onCancel(); };
+    const cleanup = () => {
+      $('am-go').removeEventListener('click', onGo);
+      $('am-cancel').removeEventListener('click', onCancel);
+      $('am-close').removeEventListener('click', onCancel);
+      window.removeEventListener('keydown', onKey, true);
+      dlg.removeEventListener('pointerdown', onBackdrop);
+      songs.removeEventListener('change', refresh);
+      $('am-skip').removeEventListener('change', refresh);
+      $('am-dur').removeEventListener('input', refresh);
+    };
+    $('am-go').addEventListener('click', onGo);
+    $('am-cancel').addEventListener('click', onCancel);
+    $('am-close').addEventListener('click', onCancel);
+    window.addEventListener('keydown', onKey, true);
+    dlg.addEventListener('pointerdown', onBackdrop);
+    songs.addEventListener('change', refresh);
+    $('am-skip').addEventListener('change', refresh);
+    $('am-dur').addEventListener('input', refresh);
+    refresh();
+    dlg.hidden = false;
+  });
 }
 
 async function automix() {
   const picked = selectedClips().length > 1 ? selectedClips() : state.clips;
   if (picked.length < 2) return toast('Karıştırmak için en az iki parça ekle');
   if (picked.some((c) => sourceOf(c).analysis !== 'done')) return toast('Parçaların analizi bitmedi, birkaç saniye sonra tekrar dene');
-  const order = planOrder(picked);
-  const names = order.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
-  const ok = await window.harman.confirmAction(
-    `${order.length} parça şu sırayla karıştırılacak`,
-    `${names.length > 600 ? `${names.slice(0, 600)}…` : names}\n\nHer geçişte tempo ve ton eşleştirilir (parça başına birkaç saniye sürer). ⌘Z ile tek adımda geri alabilirsin.`,
-    'Karıştır',
-  );
-  if (!ok) return;
+  const order = await chooseAutomix(picked);
+  if (order) await runAutomix(order);
+}
+
+// Verilen sırayla her ardışık çifte en iyi geçişi uygular. Tek geri alma adımıdır.
+async function runAutomix(order) {
   const ids = order.map((c) => c.id);
   let made = 0;
   const done = await runBusy('Otomatik karıştırma', () => groupUndo(async () => {

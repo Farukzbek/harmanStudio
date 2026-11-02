@@ -941,3 +941,16 @@ input[type="range"]:disabled { opacity: 0.45; }
 .history-item.now { background: var(--accent-soft); color: var(--accent); cursor: default; }
 .history-item.undone { color: var(--text-dim); }
 .history-empty { padding: 8px 10px; color: var(--text-faint); }
+
+/* otomatik karıştırma penceresi */
+.am-songs { display: grid; gap: 2px; margin: 8px 0; max-height: 34vh; overflow: auto; }
+.am-row { display: grid; grid-template-columns: 18px 18px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 7px; }
+.am-row:hover { background: rgba(255, 255, 255, 0.05); }
+.am-row .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-row .meta { color: var(--text-faint); font: 500 10.5px var(--mono); }
+.am-head { display: grid; grid-template-columns: 18px 18px 1fr; gap: 8px; padding: 0 8px; color: var(--text-faint); font-size: 10.5px; }
+.am-opts { display: grid; gap: 8px; margin: 8px 0; color: var(--text-dim); }
+.am-dur { display: flex; align-items: center; gap: 8px; }
+.am-dur input { width: 64px; }
+#am-preview { white-space: pre-line; max-height: 18vh; overflow: auto; }
+.am-actions { margin-top: 10px; justify-content: flex-end; }

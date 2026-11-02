@@ -321,6 +321,25 @@
     </div>
   </div>
 
+  <div id="automix" class="modal" hidden>
+    <div class="sheet slim" role="dialog" aria-label="Otomatik karıştırma">
+      <header>
+        <h2>Otomatik karıştırma</h2>
+        <button id="am-close" class="icon-btn" title="Kapat (Esc)">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
+        </button>
+      </header>
+      <p class="hint">Dahil etmek istediğin şarkıları seç, ilk çalacak olanı işaretle. Harman sırayı tempo ve tona göre kurar, her geçişte tempo ve tonu eşleştirir.</p>
+      <div id="am-songs" class="am-songs"></div>
+      <div class="am-opts">
+        <label class="check-row"><input id="am-skip" type="checkbox" checked> Tempo ya da tonca çok uyumsuz şarkıları atla</label>
+        <label class="am-dur">Hedef süre (dk, 0 = hepsi) <input id="am-dur" class="num" type="number" min="0" max="600" step="1" value="0"></label>
+      </div>
+      <p id="am-preview" class="hint"></p>
+      <div class="actions am-actions"><button id="am-cancel" class="btn solid">Vazgeç</button><button id="am-go" class="btn primary">Karıştır</button></div>
+    </div>
+  </div>
+
   <div id="help" class="modal" hidden>
     <div class="sheet" role="dialog" aria-label="Klavye kısayolları">
       <header>
