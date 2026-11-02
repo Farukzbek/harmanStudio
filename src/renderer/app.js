@@ -75,7 +75,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), welcome: $('welcome'), welcomeChecks: $('welcome-checks'), exportPreset: $('export-preset'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), exportPreset: $('export-preset'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -821,6 +821,147 @@ function buildStemBlock(name) {
   const list = document.createElement('div');
   list.className = 'ramp-list';
 
+    // Seviye grafiği: eğriyi görür, çizgi sürükleyerek geçiş çizer, uçlardaki noktaları sürükleyerek ayarlarsın.
+  // Yatay eksen parçanın süresi (zaman çizelgesi saniyesi), dikey eksen seviye (%0 alt, %100 üst).
+  const graph = document.createElement('canvas');
+  graph.className = 'ramp-graph';
+  const PAD = 7;
+  let handles = [];
+  let gdrag = null;
+  const gx = (clip, t) => ((t - clip.start) / clip.dur);
+  const gy = (h, v) => PAD + (1 - clamp(v, 0, 1)) * (h - 2 * PAD);
+  const tAt = (clip, x, w) => clip.start + clamp(x / w, 0, 1) * clip.dur;
+  const levelAtY = (y, h) => clamp(1 - (y - PAD) / (h - 2 * PAD), 0, 1);
+  const drawGraph = () => {
+    const clip = selected();
+    const w = graph.clientWidth;
+    const h = graph.clientHeight;
+    if (!clip || !w || !h || panel.hidden) return;
+    const dpr = window.devicePixelRatio || 1;
+    graph.width = Math.round(w * dpr);
+    graph.height = Math.round(h * dpr);
+    const g = graph.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    const color = STEM_COLORS[name] || '#fff';
+    g.strokeStyle = 'rgba(255,255,255,0.07)';
+    g.lineWidth = 1;
+    for (const v of [0, 0.5, 1]) { const y = Math.round(gy(h, v)) + 0.5; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+    // eğri
+    const curve = levelCurve(clip, name);
+    const N = Math.max(40, Math.floor(w / 3));
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const t = clip.start + (i / N) * clip.dur;
+      pts.push([(i / N) * w, gy(h, curveAt(curve, clip.offset + (t - clip.start), stemGain(clip, name)))]);
+    }
+    g.beginPath();
+    pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.lineTo(w, h - PAD);
+    g.lineTo(0, h - PAD);
+    g.closePath();
+    g.fillStyle = `${color}22`;
+    g.fill();
+    g.beginPath();
+    pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.strokeStyle = color;
+    g.lineWidth = 1.8;
+    g.stroke();
+    // oynatma çizgisi
+    if (state.playhead >= clip.start && state.playhead <= clipEnd(clip)) {
+      const px = Math.round(gx(clip, state.playhead) * w) + 0.5;
+      g.strokeStyle = 'rgba(255,122,69,0.8)';
+      g.beginPath(); g.moveTo(px, 0); g.lineTo(px, h); g.stroke();
+    }
+    // tutamaçlar
+    handles = [];
+    const tl = (t) => clip.start + (t - clip.offset);
+    for (const r of stemRamps(clip, name)) {
+      if (r.to === undefined) continue;
+      const base = curveAt(curve, r.start, stemGain(clip, name));
+      for (const [kind, t, v] of [['start', r.start, r.from ?? base], ['end', r.end, r.to]]) {
+        const x = gx(clip, tl(t)) * w;
+        if (x < -6 || x > w + 6) continue;
+        handles.push({ ramp: r, kind, x, y: gy(h, v) });
+      }
+    }
+    for (const hd of handles) {
+      g.beginPath();
+      g.arc(hd.x, hd.y, 4.5, 0, Math.PI * 2);
+      g.fillStyle = '#14161a';
+      g.fill();
+      g.strokeStyle = color;
+      g.lineWidth = 2;
+      g.stroke();
+    }
+    // çizilmekte olan yeni geçiş
+    if (gdrag?.mode === 'new' && gdrag.x1 !== undefined) {
+      g.setLineDash([4, 3]);
+      g.strokeStyle = '#fff';
+      g.lineWidth = 1.4;
+      g.beginPath(); g.moveTo(gdrag.x0, gdrag.y0); g.lineTo(gdrag.x1, gdrag.y1); g.stroke();
+      g.setLineDash([]);
+    }
+  };
+  const gpos = (e) => { const r = graph.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height }; };
+  graph.addEventListener('pointerdown', (e) => {
+    const clip = selected();
+    if (!clip) return;
+    const { x, y } = gpos(e);
+    const hit = handles.find((hd) => Math.hypot(hd.x - x, hd.y - y) <= 9);
+    graph.setPointerCapture(e.pointerId);
+    beginEdit();
+    gdrag = hit ? { mode: 'handle', hit } : { mode: 'new', x0: x, y0: y };
+  });
+  graph.addEventListener('pointermove', (e) => {
+    const clip = selected();
+    const { x, y, w, h } = gpos(e);
+    if (!gdrag || !clip) {
+      graph.style.cursor = handles.some((hd) => Math.hypot(hd.x - x, hd.y - y) <= 9) ? 'grab' : 'crosshair';
+      return;
+    }
+    if (!(e.buttons & 1)) return;           // Chromium'un sahte hareket olayları
+    if (gdrag.mode === 'new') {
+      gdrag.x1 = x; gdrag.y1 = y;
+    } else {
+      const { ramp, kind } = gdrag.hit;
+      const src = clip.offset + (tAt(clip, x, w) - clip.start);
+      const level = Math.round(levelAtY(y, h) * 100) / 100;
+      if (kind === 'start') { ramp.start = Math.min(src, ramp.end - 0.1); ramp.from = level; }
+      else { ramp.end = Math.max(src, ramp.start + 0.1); ramp.to = level; }
+      layoutClip(clip);
+    }
+    drawGraph();
+  });
+  const finishGraphDrag = (e, cancel = false) => {
+    const clip = selected();
+    const d = gdrag;
+    gdrag = null;
+    if (!d || !clip) { endEdit(); return; }
+    if (!cancel && d.mode === 'new' && d.x1 !== undefined && Math.abs(d.x1 - d.x0) > 8) {
+      const { w, h } = gpos(e);
+      const [a, b] = d.x0 <= d.x1 ? [[d.x0, d.y0], [d.x1, d.y1]] : [[d.x1, d.y1], [d.x0, d.y0]];
+      const src = (px) => clip.offset + (tAt(clip, px, w) - clip.start);
+      const ramp = { start: src(a[0]), end: src(b[0]), from: Math.round(levelAtY(a[1], h) * 100) / 100, to: Math.round(levelAtY(b[1], h) * 100) / 100 };
+      clip.stemRamps = { ...clip.stemRamps, [name]: [...stemRamps(clip, name), ramp].sort((p, q) => p.start - q.start) };
+    } else if (d.mode === 'handle') {
+      clip.stemRamps = { ...clip.stemRamps, [name]: [...stemRamps(clip, name)].sort((p, q) => p.start - q.start) };
+    }
+    endEdit();
+    layoutClip(clip);
+    updateInspector();
+    onEdited();
+  };
+  graph.addEventListener('pointerup', finishGraphDrag);
+  graph.addEventListener('pointercancel', (e) => finishGraphDrag(e, true));
+  graph.addEventListener('dblclick', (e) => {
+    const { x, y } = gpos(e);
+    const hit = handles.find((hd) => Math.hypot(hd.x - x, hd.y - y) <= 9);
+    if (!hit) return;
+    const idx = stemRamps(selected(), name).indexOf(hit.ramp);
+    if (idx >= 0) removeRamp(name, idx);
+  });
+
   // Yazısız küçük + / − düğmeleri: seviye geçişinin yönü (kademeli artır / kademeli azalt).
   let dir = 'up';
   const dirRow = document.createElement('div');
@@ -884,7 +1025,10 @@ function buildStemBlock(name) {
   const hint = document.createElement('p');
   hint.className = 'hint';
   hint.textContent = 'Üstteki + sesi kademeli artırır, − kademeli azaltır. Saniyeler zaman çizelgesindeki saniyelerdir (cetvelde ve sol üstteki sayaçta gördüğün); kaçıncı saniyede başlayıp kaçıncı saniyede biteceğini yaz. Seviye, başlangıç yüzdesinden hedef yüzdesine kademeli geçer; geçişten önce başlangıç, sonra hedef seviyesinde kalır. Seviye kutularını boş bırakırsan yalnızca yön değişir.';
-  panel.append(list, dirRow, form, hint);
+  const graphHint = document.createElement('p');
+  graphHint.className = 'hint';
+  graphHint.textContent = 'Grafikte çizgi sürükleyerek geçiş çiz. Uçlardaki noktaları sürükleyerek ayarla, çift tıklayınca silinir.';
+  panel.append(graph, graphHint, list, dirRow, form, hint);
 
   // Yön seçilince başlangıç/hedef değerleri yöne uyar; değerler elle yazılınca yön düğmesi ona uyar.
   const setDir = (d) => {
@@ -928,7 +1072,7 @@ function buildStemBlock(name) {
     const open = panel.hidden;
     panel.hidden = !open;
     toggle.textContent = toggle.textContent.replace(/^[▸▾]/, open ? '▾' : '▸');
-    if (open) { openRamps.add(name); prefill(); } else openRamps.delete(name);
+    if (open) { openRamps.add(name); prefill(); requestAnimationFrame(drawGraph); } else openRamps.delete(name);
   });
   add.addEventListener('click', () => {
     const num = (input) => (input.value.trim() === '' ? undefined : Number(input.value));
@@ -947,7 +1091,7 @@ function buildStemBlock(name) {
   if (!panel.hidden) prefill();      // başka parçaya geçince açık kalan panel de dolu gelsin
 
   block.append(level.row, pan.row, toggle, panel);
-  return { block, level, pan, toggle, list, panel, rampsKey: null };
+  return { block, level, pan, toggle, list, panel, rampsKey: null, drawGraph };
 }
 
 function updateStems(clip) {
@@ -978,6 +1122,7 @@ function updateStems(clip) {
     row.pan.out.textContent = panRamped ? 'Zamanlı' : panText(stemPan(clip, name));
     paintSlider(row.pan.input);
 
+    row.drawGraph();
     const ramps = stemRamps(clip, name);
     row.toggle.textContent = `${row.panel.hidden ? '▸' : '▾'} Zamanlı geçişler${ramps.length ? ` (${ramps.length})` : ''}`;
     const rampsKey = `${JSON.stringify(ramps)}|${clip.offset}|${clip.dur}|${clip.start}`;
@@ -2924,24 +3069,40 @@ async function pickAndAdd() {
 
 function toggleHelp(show = el.help.hidden) { el.help.hidden = !show; }
 
-// Başlangıç rehberi: ilk açılışta (ve Yardım menüsünden) gösterilir; eksik kurulumları söyler.
-async function showWelcome() {
-  const st = await window.harman.envStatus();
-  const li = (ok, title, note, extra = '') => `<li><span class="dot${ok ? '' : ' warn'}"></span><span>${title}<small>${note}</small>${extra}</span></li>`;
-  el.welcomeChecks.innerHTML = [
-    li(st.ffmpeg, 'ffmpeg', st.ffmpeg ? 'Bulundu: MP3 kaydetme ve tüm ses biçimleri çalışır.' : 'Bulunamadı. MP3 kaydetmek için gerekir; Terminal\'de şunu çalıştır:', st.ffmpeg ? '' : '<code>brew install ffmpeg</code>'),
-    li(st.engine, 'Vokal / enstrüman ayırma', st.engine ? 'Kurulu.' : 'İlk kullanımda otomatik kurulur (yaklaşık 1 GB indirme, bir kez).'),
-    li(st.tools, 'Tempo ve ton aracı', st.tools ? 'Kurulu.' : 'İlk kullanımda otomatik kurulur (küçük indirme, bir kez).'),
-  ].join('');
-  el.welcome.hidden = false;
-}
-function closeWelcome() {
-  el.welcome.hidden = true;
+// Giriş rehberi (tour.js): tanıtılan bölüm aydınlık kalır, geri kalanı kararır. İlk açılışta kendiliğinden
+// başlar; atlanırsa Yardım menüsünden ya da kısayol penceresindeki "Rehberi başlat" düğmesinden açılır.
+function markTourSeen() {
   try { localStorage.setItem('harman.welcomed', '1'); } catch { /* özel pencere */ }
 }
-$('welcome-close').addEventListener('click', closeWelcome);
-$('welcome-start').addEventListener('click', closeWelcome);
-el.welcome.addEventListener('pointerdown', (e) => { if (e.target === el.welcome) closeWelcome(); });
+
+async function startTour() {
+  if (Tour.active) return;
+  const st = await window.harman.envStatus();
+  const check = (ok, title, note, extra = '') => `<li><span class="dot${ok ? '' : ' warn'}"></span><span>${title}<small>${note}</small>${extra}</span></li>`;
+  const checks = `<ul class="checks">${[
+    check(st.ffmpeg, 'ffmpeg', st.ffmpeg ? 'Bulundu: MP3 kaydetme ve tüm ses biçimleri çalışır.' : 'Bulunamadı. MP3 kaydetmek için gerekir; Terminal\'de şunu çalıştır:', st.ffmpeg ? '' : '<code>brew install ffmpeg</code>'),
+    check(st.engine, 'Vokal / enstrüman ayırma', st.engine ? 'Kurulu.' : 'İlk kullanımda otomatik kurulur (yaklaşık 1 GB indirme, bir kez).'),
+    check(st.tools, 'Tempo ve ton aracı', st.tools ? 'Kurulu.' : 'İlk kullanımda otomatik kurulur (küçük indirme, bir kez).'),
+  ].join('')}</ul>`;
+  const steps = [
+    { title: 'Harman\'a hoş geldin', html: '<p>Şarkıları keserek, tempo ve tonlarını eşleştirerek ve yumuşak geçişlerle birleştirerek profesyonel görünümlü mix\'ler hazırla.</p><p>Kısa bir tur: yaklaşık bir dakika. İstediğin an atlayabilirsin; sonra <b>Yardım → Başlangıç Rehberi</b> ile tekrar açarsın.</p>' },
+    { targets: ['#btn-add'], title: 'Şarkı ekle', html: '<p>Buradan ya da dosyaları pencereye sürükleyerek ekle (MP3, WAV, FLAC, M4A…). Her şarkı bir hatta gelir; tempo ve tonunu Harman kendisi analiz eder.</p><p>Birden çok şarkıyı ekleyince <b>Düzen → Şarkıları otomatik sırala ve karıştır</b> hepsini tek seferde dizer.</p>' },
+    { targets: ['#timeline'], pad: 0, title: 'Zaman çizelgesi', html: '<p>Dört hat var. Parçaları sürükleyerek taşı, kenarlarından kes, <kbd>S</kbd> ile oynatma çizgisinden böl.</p><p>İki parçayı üst üste bindirip fade verirsen crossfade olur. Boş yerde sürükleyerek toplu seç, sağ tıkla menüleri aç.</p>' },
+    { targets: ['.transport', '#lcd'], title: 'Oynatma ve sayaç', html: '<p><kbd>Boşluk</kbd> tıkladığın yerden çalar. Sayaca tıklayıp saniye yazarak istediğin yere git.</p><p><kbd>L</kbd> seçili parçayı ya da uyguladığın geçişi döngüde dinletir.</p>' },
+    { targets: ['.zoom'], title: 'Yakınlaştırma', html: '<p><kbd>⌥</kbd> + kaydır ya da trackpad\'de sıkıştır. <kbd>⌘0</kbd> hepsini sığdırır.</p><p>Yakınlaştıkça vuruş çizgileri görünür; kesimleri vuruşa oturtmak kolaylaşır.</p>' },
+    { targets: ['#inspector'], title: 'Parça ayarları', html: '<p>Bir parçayı seçince burada: seviye, sol/sağ denge, bas ve tiz, BPM ve ton, başka bir parçaya tempo-ton eşleştirme, <b>Geçiş öner</b>, vokal/enstrüman ayırma ve fade.</p><p>Birden çok parça seçiliyse ayarlar hepsine birlikte uygulanır.</p>' },
+    { targets: ['#export-preset', '.switch-group', '#btn-export'], title: 'Kaydet ve dışa aktar', html: '<p>Çıktı ayarını seç (Araba, Telefon, Kayıpsız), normalize\'i aç ya da kapat ve <b>Mix\'i kaydet</b>.</p><p><kbd>⌘S</kbd> projeni saklar; çalışırken 15 saniyede bir otomatik yedek alınır, beklenmedik kapanmada geri yüklenir.</p>' },
+    { targets: ['#btn-help'], title: 'Kısayollar ve rehber', html: '<p>Tüm kısayollar ve hareketler burada (<kbd>⌘/</kbd>). Aynı pencerede <b>Rehberi başlat</b> düğmesi bu turu baştan açar; Yardım menüsünden de ulaşabilirsin.</p>' },
+    { title: 'Kurulum durumu', html: `${checks}<p>Hepsi bu kadar. İyi karışımlar!</p>` },
+  ];
+  Tour.start(steps, {
+    onEnd: (reason) => {
+      markTourSeen();
+      if (reason === 'skip') toast('Rehbere Yardım → Başlangıç Rehberi ya da ⌘/ penceresinden tekrar ulaşabilirsin');
+    },
+  });
+}
+$('help-tour').addEventListener('click', () => { toggleHelp(false); startTour(); });
 
 // ------------------------------------------------------------------- proje
 // Proje = .harman (JSON) + yanındaki .harman-data klasörü. Orijinal şarkılar dosya yoluyla bağlanır
@@ -3357,7 +3518,7 @@ const actions = {
   'zoom-out': () => zoomBy(1 / 1.4),
   fit: fitAll,
   help: () => toggleHelp(),
-  welcome: showWelcome,
+  welcome: startTour,
 };
 
 // ----------------------------------------------------------------- olaylar
@@ -3444,6 +3605,7 @@ window.harman.onFilesDropped(async (paths) => {
   addFiles(paths);
 });
 window.harman.onMenu((id) => {
+  if (Tour.active && id !== 'welcome') return;        // rehber açıkken menü eylemleri bekler
   const field = document.activeElement;
   const typingInField = field && (field.tagName === 'TEXTAREA' || (field.tagName === 'INPUT' && field.type !== 'range'));
   // Bir yazı kutusunda ⌘Z yazıyı geri almalı, parça düzenlemelerini değil.
@@ -3574,10 +3736,6 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !sep.running) closeSep();
     return;
   }
-  if (!el.welcome.hidden) {
-    if (e.key === 'Escape') closeWelcome();
-    return;
-  }
   if (!el.help.hidden) {
     if (e.key === 'Escape') toggleHelp(false);
     return;
@@ -3630,7 +3788,7 @@ buildTracks();
 offerRestore().then(() => {
   let seen = false;
   try { seen = !!localStorage.getItem('harman.welcomed'); } catch { /* özel pencere */ }
-  if (!seen && !state.clips.length) showWelcome();
+  if (!seen && !state.clips.length) startTour();
 });
 [el.insGain, el.insFadeIn, el.insFadeOut].forEach(paintSlider);
 layoutAll();

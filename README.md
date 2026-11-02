@@ -18,6 +18,8 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Fareyle dikdörtgen çizerek toplu seçim; seçili parçaları birlikte taşı, böl, çoğalt, sil. Sürüklerken görünümün kenarına gelince otomatik kayar
 - Her hattın sağ altında bir kutucuk: kapatırsan o hattaki parçalar çalmaz (kaydedilen mix'e de girmez)
 - Her parça bağımsızdır: bir şarkıdan kesilen, çoğaltılan veya yapıştırılan parçaların BPM/ton düzeltmesi, vokal ayırma sonucu, tempo/ton değişikliği, zamanlı geçişleri ve sıfırlaması kendilerine aittir. Ses verisi paylaşıldığı için bellek harcanmaz; aynı sesten ayrılmış parçalar varsa yeniden hesaplanmadan kullanılır
+- Döngüde dinleme (**L**): seçili parçayı ya da uyguladığın geçişi tekrar tekrar çal; geçiş uygularken "Uygula ve döngüde dinle" geçiş bölgesini döngüye alır
+- Yakınlaşınca dalga formunda vuruş çizgileri (her 4 vuruş belirgin) görünür; kesim ve geçişleri vuruşa oturtmak kolaylaşır
 - Çalarken yakınlaştır (⌥ + kaydır, trackpad'de sıkıştır), sağa sola git, istediğin saniyeye tıkla veya yaz; Boşluk son tıklanan yerden oynatır. Sol üstteki sayaç büyükte saniyeyi (61.37), küçükte dakika:saniyeyi (1:01.37) gösterir
 
 **Ses ve karışım**
@@ -25,12 +27,18 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Seviye eşitleme: seçili parçaların ses yüksekliğini birbirine yaklaştırır (iki şarkıdan biri diğerinden yüksek çıkmasın)
 - Vokal / enstrüman ayırma: vokal, davul, bas, diğer. Her ses parçasının seviyesi ve sol/sağ dengesi ayrı; "Sadece vokal" / "Vokalsiz" ön ayarları
 - Zamanlı geçişler (her ses parçası için ayrı): şarkının istediğin saniyeleri arasında seviyeyi bir yüzdeden başka bir yüzdeye (artan veya azalan) ve istersen yönü (sol/sağ) kademeli olarak götür. Ör. davul 54. saniyeden 75. saniyeye %12'den %86'ya yükselsin, sol kulaktan sağ kulağa geçsin
+- Zamanlı geçişleri **grafikte çiz**: ses parçasının "Zamanlı geçişler" bölümündeki grafikte çizgi sürükleyerek geçiş oluştur, uçlardaki noktaları sürükleyerek ayarla, çift tıklayarak sil (formla saniye yazmak da mümkün)
+- EQ: parça başına bas ve tiz (±12 dB). **Bas takası** (DJ geçişi): geçişin ortasında çıkan parçanın basını kısar, giren parçanın basını açar; baslar üst üste binip mix'i bulandırmaz. Geçiş önerilerinde varsayılan olarak açıktır
 - Sürgülerin yanındaki değere (ör. "Sağ 3", "%80") tıklamak varsayılana döndürür
 
 **Tempo ve ton**
 - Otomatik BPM, ton (Camelot koduyla) ve ilk vuruş analizi; klip başlığında "124 BPM · 8A" etiketi
 - Bir parçayı diğerinin tempoyuna ve tonuna getir (Rubber Band ile), vuruşları hizala
+- **Şarkıları otomatik sırala ve karıştır** (Düzen menüsü): seçili parçaları (ya da hepsini) tempo ve tona göre en uygun sıraya dizer, her çift için en iyi geçişi uygular. Tek geri alma adımıdır
 - Akıllı geçiş önerileri: iki parça için en iyi 3 geçişi önerir ve tek tıkla uygular. Geçiş uzunluğu 8 / 16 / 32 vuruş seçilebilir
+
+**Başlangıç**
+- İlk açılışta giriş rehberi: tanıtılan bölüm aydınlık kalır, geri kalanı yumuşakça kararır. Atlanabilir; **Yardım → Başlangıç Rehberi** ya da kısayol penceresindeki (⌘/) "Rehberi başlat" düğmesiyle tekrar açılır. Son adımda ffmpeg ve motor kurulumlarının durumunu gösterir
 
 **Projeler ve güvenlik**
 - Projeyi kaydet / aç (`.harman`, ⌘S / ⌥⌘O): tüm parçalar, ayarlar, zamanlı geçişler, tempo/ton değişiklikleri ve ayrılmış sesler olduğu gibi geri gelir; açınca yeniden ayırmak veya işlemek gerekmez. Orijinal şarkılar kopyalanmaz, yolla bağlanır; taşınmışsa açılışta yeni konumu göstermeni ister
@@ -38,7 +46,7 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Kaydedilmemiş değişiklik varken pencereyi kapatırsan (ya da ⌘Q) Kaydet / Kaydetme / Vazgeç diye sorar
 
 **Çıktı**
-- MP3 (320 kbps) veya WAV; biçim kaydetme penceresindeki dosya türünden seçilir
+- Çıktı ayarları: **Araba** (MP3 320 kbps), **Telefon** (MP3 192 kbps), **Kayıpsız** (WAV); normalize da buna göre ayarlanır. Dosya türü kaydetme penceresinde değiştirilebilir
 - İsteğe bağlı normalize: mix'in en yüksek ses tepesini −1 dB'e ayarlar
 
 ## Gereksinimler
@@ -64,6 +72,13 @@ npm run package
 `dist/` altına `Harman.app` üretir ve masaüstüne kısayol koyar. İkon betiği (`scripts/make-icon.js`) ilk derlemede çalışır.
 
 Harman o sırada açıksa açık penceredeki çalışmayı bozmamak için yeni sürüm `dist-next/` klasörüne derlenir ve masaüstü kısayoluna dokunulmaz. Harman'ı kapatıp komutu tekrar çalıştırınca kısayol güncellenir.
+
+## Geliştirme
+
+```bash
+npm test        # BPM/ton analizi, geçiş önerileri ve proje dosyası testleri
+npm run dmg     # dist-dmg/Harman-<sürüm>.dmg üretir (imzasız)
+```
 
 ## Projeler ve otomatik yedek
 
@@ -157,6 +172,7 @@ Uygulama içinde `⌘/` ile tam liste açılır.
 | ⌫ | Parçayı sil |
 | ⌘Z / ⇧⌘Z | Geri al / yinele |
 | ⌘O / ⌘E | Şarkı ekle / mix'i kaydet |
+| L | Seçili parçayı döngüde dinle (tekrar L: kapat) |
 | ⌘S / ⌥⌘S | Projeyi kaydet / farklı kaydet |
 | ⌥⌘O / ⌘N | Proje aç / yeni proje |
 | ⌥ + kaydır | Parmaklar yukarı yakınlaştırır, aşağı uzaklaştırır (imlecin olduğu yerde) |
@@ -178,7 +194,8 @@ src/tempo.js           Tempo / ton aracı (Rubber Band) yönetimi
 src/pyenv.js           Python ortamı kurma ve süreç çalıştırma yardımcıları
 src/saveformat.js      Kaydetme yolundan biçim çıkarma
 src/projectfile.js     Proje dosyası ve yan ses dosyaları için güvenli (geçici dosya + yeniden adlandırma) yazma
-src/renderer/          Arayüz: index.html, style.css, app.js (zaman çizelgesi, ses motoru), analysis.js (BPM / ton / enerji), transitions.js (geçiş önerileri)
+src/renderer/          Arayüz: index.html, style.css, app.js (zaman çizelgesi, ses motoru), analysis.js (BPM / ton / enerji), transitions.js (geçiş önerileri), tour.js (giriş rehberi)
+test/                  Birim testleri (node --test)
 tools/separate.py      Ayırma motorunu bellek sınırıyla başlatır
 tools/stretch.py       Tempo / ton değiştirme (pedalboard / Rubber Band)
 scripts/               Derleme ve ikon betikleri
@@ -190,13 +207,15 @@ Ses, Web Audio ile arayüzde çalınır ve kaydedilir; ağır işler (ayırma, t
 
 - Yalnızca macOS / Apple Silicon denendi. Vokal ayırma MLX gerektirdiği için Intel Mac ve diğer sistemlerde çalışmaz.
 - Tempo ve ton tespiti gerçek müzikle geniş ölçekte denenmedi; ton tespiti özellikle tahminidir.
-- Zamanlı geçişler form ile girilir; parçanın üstünde fareyle çekilen bir eğri yok.
+- Uygulama imzasız ve notarize edilmemiş: başka bir Mac'te ilk açılışta sağ tık → Aç demek gerekir. Windows ve Intel Mac desteklenmiyor.
 - Proje dosyaları taşınabilir ama orijinal şarkılara dosya yoluyla bağlıdır; başka bilgisayara taşırken şarkıları da götür.
 - Toplu seçimde seviye, denge ve fade tüm seçili parçalara uygulanır; ses parçası (vokal, davul…) ayarları ve zamanlı geçişler yalnızca birincil parçaya.
 
 ## Fikirler
 
-- Zamanlı geçişleri parçanın üstünde fareyle çizme
+- Geçiş noktalarında vuruşa yapışma (snap)
+- İmzalı ve notarize edilmiş sürüm
+- Daha geniş müzik koleksiyonuyla BPM / ton doğruluğunu ölçme ve iyileştirme
 
 ## Lisans ve üçüncü parti notları
 

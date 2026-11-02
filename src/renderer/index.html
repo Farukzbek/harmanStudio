@@ -263,29 +263,11 @@
     </aside>
   </main>
 
-  <div id="welcome" class="modal" hidden>
-    <div class="sheet narrow" role="dialog" aria-label="Başlangıç rehberi">
-      <header>
-        <h2>Harman'a hoş geldin</h2>
-        <button id="welcome-close" class="icon-btn" title="Kapat (Esc)">
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
-        </button>
-      </header>
-      <ol class="steps">
-        <li><b>Şarkıları ekle.</b> Dosyaları pencereye sürükle ya da "Şarkı ekle"ye bas. Her şarkı kendi hattına gelir.</li>
-        <li><b>Geçişi kur.</b> Bir parçayı seçip "Geçiş öner"e bas: Harman tempo, ton ve enerjiye bakıp en iyi 3 geçişi önerir. Çok şarkın varsa Düzen menüsündeki "Şarkıları otomatik sırala ve karıştır" hepsini tek seferde dizer. Ya da parçaları üst üste sürükleyip fade ver.</li>
-        <li><b>Dinle ve kaydet.</b> Boşluk çalar, L seçili parçayı döngüde dinletir. Beğenince "Mix'i kaydet" ya da ⌘S ile projeyi sakla.</li>
-      </ol>
-      <h4>Kurulum durumu</h4>
-      <ul id="welcome-checks" class="checks"></ul>
-      <div class="actions"><button id="welcome-start" class="btn primary">Başla</button></div>
-    </div>
-  </div>
-
   <div id="help" class="modal" hidden>
     <div class="sheet" role="dialog" aria-label="Klavye kısayolları">
       <header>
         <h2>Klavye ve hareketler</h2>
+        <button id="help-tour" class="btn solid mini" title="Giriş rehberini baştan göster">Rehberi başlat</button>
         <button id="help-close" class="icon-btn" title="Kapat (Esc)">
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
         </button>
@@ -398,6 +380,7 @@
   <div id="toast" class="toast" hidden></div>
   <script src="analysis.js"></script>
   <script src="transitions.js"></script>
+  <script src="tour.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
