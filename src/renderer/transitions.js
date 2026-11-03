@@ -169,7 +169,60 @@
   };
   const fadeShape = (curve, u) => (FADE_CURVES[curve] || FADE_CURVES.power)(clamp(u, 0, 1));
 
-  const api = { suggestTransitions, meanEnergy, fadeShape, FADE_CURVES };
+  // İki şarkı arasındaki "geçiş maliyeti": tempo farkı (%, yarıya/iki katına en yakın) ve gereken yarım ton kayması.
+  // Düşük = uyumlu. a, b: { bpm, key }. H: { semitonesToMatch } (analysis.js)
+  function transitionCost(a, b, H) {
+    const dist = (f) => Math.abs(Math.log((a.bpm * f) / b.bpm));
+    const factor = [0.5, 1, 2].reduce((best, f) => (dist(f) < dist(best) ? f : best), 1);
+    const pct = Math.abs((a.bpm * factor) / b.bpm - 1) * 100;
+    const semis = Math.abs(H.semitonesToMatch(b.key, a.key));
+    return pct * 0.6 + semis * 1.2;
+  }
+
+  // Açgözlü sıralama: start'tan başlar, her adımda maliyeti en düşük kalan şarkı gelir.
+  // items: [{ id, bpm, key, dur, start }]. maxCost: bundan uyumsuzsa durur; targetSec: tahmini süre buna ulaşınca
+  // durur (en az iki şarkı olmadan durmaz). Dönüş: { order: [id], skipped: [id], estimate (sn) }.
+  function orderSongs(items, H, { start = null, maxCost = Infinity, targetSec = 0 } = {}) {
+    const rest = [...items].sort((x, y) => x.start - y.start);
+    const first = rest.splice(Math.max(0, rest.findIndex((c) => c.id === start)), 1)[0];
+    const order = [first];
+    let total = first.dur * 0.8;
+    while (rest.length) {
+      if (targetSec > 0 && total >= targetSec && order.length >= 2) break;
+      const cur = order[order.length - 1];
+      let best = 0;
+      let bestCost = Infinity;
+      rest.forEach((c, i) => {
+        const cost = transitionCost(cur, c, H);
+        if (cost < bestCost) { bestCost = cost; best = i; }
+      });
+      if (bestCost > maxCost) break;
+      const next = rest.splice(best, 1)[0];
+      order.push(next);
+      total += next.dur * 0.8;
+    }
+    return { order: order.map((c) => c.id), skipped: rest.map((c) => c.id), estimate: total };
+  }
+
+  // Mix'in bölüneceği yerler. İşaretçi varsa onlar; yoksa ardışık parçaların geçiş ortaları (boşluk varsa ilkinin bitişi).
+  // clips: [{ start, dur, name }], markers: [{ t, name }]. Dönüş: [{ name, t0, t1 }] (en az iki parça yoksa boş).
+  function splitPoints({ clips, markers, end }) {
+    const marks = [...markers].filter((m) => m.t > 0.05 && m.t < end - 0.05).sort((a, b) => a.t - b.t);
+    if (marks.length) {
+      const starts = [{ t: 0, name: 'Başlangıç' }, ...marks.map((m) => ({ t: m.t, name: m.name }))];
+      return starts.map((s, i) => ({ name: s.name, t0: s.t, t1: i + 1 < starts.length ? starts[i + 1].t : end }));
+    }
+    const sorted = [...clips].sort((a, b) => a.start - b.start);
+    if (sorted.length < 2) return [];
+    const cuts = [];
+    for (let i = 0; i + 1 < sorted.length; i++) {
+      const aEnd = sorted[i].start + sorted[i].dur;
+      cuts.push(sorted[i + 1].start < aEnd ? (sorted[i + 1].start + aEnd) / 2 : aEnd);
+    }
+    return sorted.map((c, i) => ({ name: c.name, t0: i === 0 ? 0 : cuts[i - 1], t1: i + 1 < sorted.length ? cuts[i] : end }));
+  }
+
+  const api = { suggestTransitions, meanEnergy, fadeShape, FADE_CURVES, transitionCost, orderSongs, splitPoints };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Transitions = api;
 }(typeof window !== 'undefined' ? window : globalThis));

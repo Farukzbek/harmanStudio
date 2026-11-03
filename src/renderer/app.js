@@ -2374,21 +2374,11 @@ function sliceBuffer(buffer, t0, t1) {
 
 // Mix'in bölüneceği yerler: işaretçiler varsa onlar, yoksa ardışık parçaların geçiş ortaları.
 function splitPlan() {
-  const end = projectEnd();
-  const marks = [...state.markers].filter((m) => m.t > 0.05 && m.t < end - 0.05).sort((a, b) => a.t - b.t);
-  if (marks.length) {
-    const starts = [{ t: 0, name: 'Başlangıç' }, ...marks.map((m) => ({ t: m.t, name: m.name }))];
-    return starts.map((s, i) => ({ name: s.name, t0: s.t, t1: i + 1 < starts.length ? starts[i + 1].t : end }));
-  }
-  const sorted = [...state.clips].sort((a, b) => a.start - b.start);
-  if (sorted.length < 2) return [];
-  const cuts = [];
-  for (let i = 0; i + 1 < sorted.length; i++) {
-    const a = sorted[i];
-    const b = sorted[i + 1];
-    cuts.push(b.start < clipEnd(a) ? (b.start + clipEnd(a)) / 2 : clipEnd(a));      // geçişin ortası
-  }
-  return sorted.map((c, i) => ({ name: c.name, t0: i === 0 ? 0 : cuts[i - 1], t1: i + 1 < sorted.length ? cuts[i] : end }));
+  return Transitions.splitPoints({
+    clips: state.clips.map((c) => ({ start: c.start, dur: c.dur, name: c.name })),
+    markers: state.markers,
+    end: projectEnd(),
+  });
 }
 
 async function exportSplit() {
@@ -3432,39 +3422,16 @@ async function applyTransition(s, aId, bId, listen, { inBusy = false } = {}) {
 // Seçili parçaları (seçim yoksa hepsini) birbirine en uygun sıraya dizer ve her ardışık çift için en iyi
 // geçişi uygular. Sıra açgözlü seçilir: en soldaki parçadan başlar, her adımda tempoca ve tonca en yakın
 // kalan parça gelir. Tempo/ton değişimi eşleştirme bölümündeki kutulara uyar. Hepsi tek geri alma adımıdır.
-function transitionCost(a, b) {
-  const dist = (f) => Math.abs(Math.log((a.bpm * f) / b.bpm));
-  const factor = [0.5, 1, 2].reduce((best, f) => (dist(f) < dist(best) ? f : best), 1);
-  const pct = Math.abs((a.bpm * factor) / b.bpm - 1) * 100;
-  const semis = Math.abs(Analysis.semitonesToMatch(b.key, a.key));
-  return pct * 0.6 + semis * 1.2;
-}
+const transitionCost = (a, b) => Transitions.transitionCost(a, b, Analysis);
 
 // Sıra açgözlü kurulur: seçilen ilk şarkıdan başlar, her adımda tempoca ve tonca en yakın kalan gelir.
 // maxCost: bundan uyumsuz bir sonraki şarkı kalırsa dizilim durur (kalanlar atlanır).
 // targetSec: tahmini toplam süre buna ulaşınca durur (0 = hepsi).
-function planOrder(clips, { start = null, maxCost = Infinity, targetSec = 0 } = {}) {
-  const rest = [...clips].sort((x, y) => x.start - y.start);
-  const first = rest.splice(Math.max(0, rest.findIndex((c) => c.id === start)), 1)[0];
-  const order = [first];
-  let total = first.dur * 0.8;
-  const skipped = [];
-  while (rest.length) {
-    if (targetSec > 0 && total >= targetSec && order.length >= 2) break;      // en az iki şarkı olmadan karışım olmaz
-    const cur = sourceOf(order[order.length - 1]);
-    let best = 0;
-    let bestCost = Infinity;
-    rest.forEach((c, i) => {
-      const cost = transitionCost(cur, sourceOf(c));
-      if (cost < bestCost) { bestCost = cost; best = i; }
-    });
-    if (bestCost > maxCost) break;
-    const next = rest.splice(best, 1)[0];
-    order.push(next);
-    total += next.dur * 0.8;
-  }
-  skipped.push(...rest);
-  return { order, skipped, estimate: total };
+function planOrder(clips, opts = {}) {
+  const items = clips.map((c) => ({ id: c.id, bpm: sourceOf(c).bpm, key: sourceOf(c).key, dur: c.dur, start: c.start }));
+  const r = Transitions.orderSongs(items, Analysis, opts);
+  const byId = new Map(clips.map((c) => [c.id, c]));
+  return { order: r.order.map((id) => byId.get(id)), skipped: r.skipped.map((id) => byId.get(id)), estimate: r.estimate };
 }
 
 // Seçim penceresi: dahil edilecek şarkılar, ilk şarkı, uyumsuzları atlama ve hedef süre. Seçilen sırayı döndürür.
