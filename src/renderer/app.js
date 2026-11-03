@@ -1546,37 +1546,39 @@ function beginRename(clip) {
 
 // Seviye eşitleme: her parçanın çaldığı bölümün RMS'i (ses parçaları varsa seviyeleriyle) ölçülür;
 // seçilenlerin ortanca yüksekliği hedef olur, her parçanın seviyesi buna göre ayarlanır.
-function clipRms(clip) {
+// Parçanın çaldığı bölümün ses yüksekliği (LUFS): ses parçaları varsa seviyeleriyle karıştırılır.
+// −∞ dönerse parça sessizdir. Parça kazancı (gain) hesaba katılmaz; eşitlerken ayrıca uygulanır.
+function clipLufs(clip) {
   const src = sourceOf(clip);
   const parts = hasStems(clip) && Object.values(clip.stemGains).some((g) => g !== 1)
     ? Object.entries(src.stems).map(([n, s]) => ({ buffer: s.buffer, g: stemGain(clip, n) }))
     : [{ buffer: src.buffer, g: 1 }];
   const i0 = Math.max(0, Math.floor(clip.offset * SAMPLE_RATE));
   const i1 = Math.min(src.buffer.length, Math.floor((clip.offset + clip.dur) * SAMPLE_RATE));
-  const chans = parts.map((p) => [p.buffer.getChannelData(0), p.buffer.getChannelData(p.buffer.numberOfChannels > 1 ? 1 : 0), p.g]);
-  let sum = 0;
-  let n = 0;
-  for (let i = i0; i < i1; i += 3) {
-    let l = 0;
-    let r = 0;
-    for (const [cl, cr, g] of chans) { l += cl[i] * g; r += cr[i] * g; }
-    sum += l * l + r * r;
-    n += 2;
+  const len = Math.max(0, i1 - i0);
+  const out = [new Float32Array(len), new Float32Array(len)];
+  for (const p of parts) {
+    for (let ch = 0; ch < 2; ch++) {
+      const data = p.buffer.getChannelData(Math.min(ch, p.buffer.numberOfChannels - 1));
+      for (let i = 0; i < len; i++) out[ch][i] += data[i0 + i] * p.g;
+    }
   }
-  return n ? Math.sqrt(sum / n) : 0;
+  return Mastering.lufs(out, SAMPLE_RATE);
 }
 
+// Seviye eşitleme: seçili parçaların ses yüksekliği (LUFS, kapılı ölçüm) birbirine yaklaştırılır; hedef,
+// seçilenlerin ortancasıdır. Parça başına kazanç en çok %150 olabilir.
 function equalizeLevels() {
   const clips = selectedClips();
   if (clips.length < 2) return toast('Seviyeyi eşitlemek için en az iki parça seç');
-  const measured = clips.map((c) => ({ c, rms: clipRms(c) })).filter((m) => m.rms > 1e-4);
+  const measured = clips.map((c) => ({ c, l: clipLufs(c) })).filter((m) => Number.isFinite(m.l));
   if (measured.length < 2) return toast('Seçilen parçalar neredeyse sessiz');
-  const eff = measured.map((m) => m.rms * m.c.gain).sort((a, b) => a - b);
+  const eff = measured.map((m) => m.l + 20 * Math.log10(Math.max(m.c.gain, 1e-4))).sort((a, b) => a - b);
   const target = eff[Math.floor((eff.length - 1) / 2)];
   let capped = 0;
   mutate(() => {
-    for (const { c, rms } of measured) {
-      const want = target / rms;
+    for (const { c, l } of measured) {
+      const want = 10 ** ((target - l) / 20);
       c.gain = Math.round(clamp(want, 0, 1.5) * 100) / 100;
       if (want > 1.5) capped++;
       layoutClip(c);
@@ -1584,7 +1586,7 @@ function equalizeLevels() {
   });
   updateInspector();
   onEdited();
-  toast(capped ? `Seviyeler eşitlendi, ${capped} parça en yüksek seviyede kaldı` : 'Seviyeler eşitlendi. ⌘Z ile geri alabilirsin');
+  toast(capped ? `Seviyeler eşitlendi, ${capped} parça en yüksek seviyede kaldı` : `Seviyeler eşitlendi (yaklaşık ${target.toFixed(1).replace('.', ',')} LUFS). ⌘Z ile geri alabilirsin`);
 }
 el.insLevel.addEventListener('click', equalizeLevels);
 wireSlider(el.zoom, (v) => setZoom(ppsFromSlider(v)));
@@ -2251,27 +2253,27 @@ function encodeWav(buffer) {
 // Çıktı biçimi (MP3 ya da WAV) kaydetme penceresinde seçilir; son seçilen bir sonraki sefer varsayılan olur.
 const lastFormat = () => { try { return localStorage.getItem('harman.lastFormat') === 'wav' ? 'wav' : 'mp3'; } catch { return 'mp3'; } };
 
-// Mix'i çevrimdışı çizer. normalize: en yüksek tepeyi −1 dB'e getirir. stemOnly: yalnızca bir ses parçası.
+// Mix'i çevrimdışı çizer. normalize: ses yüksekliğini LUFS hedefine getirir ve tepeleri sınırlar (mastering.js).
+// stemOnly: yalnızca bir ses parçası. Normalize bilgisi lastMaster'a yazılır.
+const MASTER_TARGET_LUFS = -14;
+const MASTER_CEILING_DB = -1;
+let lastMaster = null;
 async function renderMix({ normalize = state.normalize, stemOnly = null } = {}) {
   const total = projectEnd();
   const offline = new OfflineAudioContext(2, Math.ceil(total * SAMPLE_RATE), SAMPLE_RATE);
   scheduleMix(offline, 0, 0, offline.destination, { stemOnly });
   const rendered = await offline.startRendering();
+  lastMaster = null;
   if (normalize) {
-    let peak = 0;
-    for (let ch = 0; ch < rendered.numberOfChannels; ch++) {
-      for (const v of rendered.getChannelData(ch)) if (Math.abs(v) > peak) peak = Math.abs(v);
-    }
-    if (peak > 0) {
-      const scale = 0.891 / peak;        // -1 dBFS
-      for (let ch = 0; ch < rendered.numberOfChannels; ch++) {
-        const data = rendered.getChannelData(ch);
-        for (let i = 0; i < data.length; i++) data[i] *= scale;
-      }
-    }
+    const channels = [rendered.getChannelData(0), rendered.getChannelData(1)];
+    lastMaster = Mastering.normalizeLoudness(channels, SAMPLE_RATE, { targetLufs: MASTER_TARGET_LUFS, ceilingDb: MASTER_CEILING_DB });
   }
   return rendered;
 }
+
+const masterNote = () => (lastMaster && Number.isFinite(lastMaster.after)
+  ? ` · ${lastMaster.after.toFixed(1).replace('.', ',')} LUFS${lastMaster.reductionDb > 0.5 ? `, tepeler en çok ${lastMaster.reductionDb.toFixed(1).replace('.', ',')} dB sınırlandı` : ''}`
+  : '');
 
 const mixBaseName = () => project.name || (state.clips[0] ? `${state.clips[0].name} mix` : 'Mix');
 
@@ -2285,7 +2287,7 @@ async function exportMix() {
     const saved = await window.harman.saveMix(encodeWav(rendered), `${state.clips[0].name} mix`, lastFormat(), 320);
     if (saved) {
       try { localStorage.setItem('harman.lastFormat', /\.wav$/i.test(saved) ? 'wav' : 'mp3'); } catch { /* özel pencere */ }
-      toast(`Kaydedildi: ${saved}`);
+      toast(`Kaydedildi: ${saved}${masterNote()}`);
     }
   } catch (err) {
     toast(`Kaydedilemedi: ${friendly(err.message)}`, true);

@@ -75,7 +75,7 @@
         <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M8 7.2v4M8 4.9v.01"/></svg>
         <span id="normalize-tip" class="tip" role="tooltip">
           <b>Normalize</b>
-          Mix'i kaydederken en yüksek ses tepesini −1 dB'e ayarlar. Çok sessiz bir mix güçlenir, üst üste binen sesler yüzünden taşıp bozulan bir mix kısılır. Şarkıların ortalama yüksekliğini birbirine eşitlemez.
+          Mix'i kaydederken ses yüksekliğini −14 LUFS'a getirir (YouTube, Spotify gibi servislerin ve arabada dinlemenin standardı) ve tepeleri −1 dB'in altında tutar (sınırlayıcı). Çok sessiz bir mix güçlenir, taşan bir mix kısılır. Mix içindeki şarkıların yüksekliğini birbirine eşitlemez: onun için parçaları seçip "Seçilenlerin seviyesini eşitle"yi kullan.
         </span>
       </button>
     </div>
@@ -464,6 +464,7 @@
 
   <div id="toast" class="toast" hidden></div>
   <script src="analysis.js"></script>
+  <script src="mastering.js"></script>
   <script src="transitions.js"></script>
   <script src="tour.js"></script>
   <script src="app.js"></script>
