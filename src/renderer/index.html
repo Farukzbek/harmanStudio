@@ -168,6 +168,10 @@
             <button id="ins-swap" class="switch" role="switch" aria-checked="false" aria-label="Geçişte bas takası"><i></i></button>
             <span title="Parçanın fade bölgelerinde basını geçişin ortasında kısar / açar; iki parçanın basları üst üste binip çamurlaşmaz">Geçişte bas takası</span>
           </div>
+          <div class="match-line">
+            <button id="ins-sweep" class="switch" role="switch" aria-checked="false" aria-label="Geçişte filtre süpürmesi"><i></i></button>
+            <span title="Çıkış fade'inde parça incelerek uzaklaşır (yüksek geçiren süpürme), giriş fade'inde perde açılır gibi parlar (alçak geçiren süpürme)">Geçişte filtre süpürmesi</span>
+          </div>
           <p id="ins-multi" class="hint" hidden></p>
           <button id="ins-level" class="btn solid wide" hidden title="Seçili parçaların ses yüksekliğini birbirine yaklaştırır">Seçilenlerin seviyesini eşitle</button>
         </section>
@@ -231,6 +235,10 @@
                 <div id="trans-template-form" class="tpl-form" hidden>
                   <input id="trans-template-name" type="text" maxlength="40" placeholder="Şablon adı" aria-label="Şablon adı" autocomplete="off" spellcheck="false">
                   <button id="trans-template-ok" class="btn solid mini">Kaydet</button>
+                </div>
+                <div class="match-line">
+                  <button id="trans-sweep" class="switch" role="switch" aria-checked="false" aria-label="Filtre süpürmesi"><i></i></button>
+                  <span title="Çıkan parça incelerek uzaklaşır, giren parça perde açılır gibi parlar">Filtre süpürmesi</span>
                 </div>
                 <div class="seg-row">
                   <span>Eğri</span>
