@@ -1481,9 +1481,10 @@ async function scanLibraryFolder() {
   const picked = await window.harman.libraryPickFolder();
   if (!picked) return;
   const known = new Set((await window.harman.libraryList()).map((e) => e.path));
-  const todo = picked.files.filter((f) => !known.has(f));
+  const bad = new Set(await window.harman.libraryFailedList());
+  const todo = picked.files.filter((f) => !known.has(f) && !bad.has(f));
   if (!picked.files.length) return toast('Bu klasörde ses dosyası bulunamadı');
-  if (!todo.length) return toast(`Klasördeki ${picked.files.length} şarkı zaten kütüphanede`);
+  if (!todo.length) return toast(`Klasördeki ${picked.files.length} dosyanın hepsi zaten kütüphanede ya da daha önce okunamadı`);
   libScan.running = true;
   libScan.cancel = false;
   el.libFolder.textContent = 'Durdur';
@@ -1502,6 +1503,7 @@ async function scanLibraryFolder() {
       done++;
     } catch (err) {
       console.error('Kütüphane analizi başarısız', file, err);
+      window.harman.libraryMarkFailed(file).catch(() => {});
       failed++;
     }
     await new Promise((r) => setTimeout(r, 30));          // arayüze nefes aldır

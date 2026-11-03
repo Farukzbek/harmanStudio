@@ -291,6 +291,17 @@ ipcMain.handle('library-upsert', (_e, entry) => {
   if (keys.length > 3000) for (const k of keys.sort((a, b) => lib[a].at - lib[b].at).slice(0, keys.length - 3000)) delete lib[k];
   try { fs.writeFileSync(libraryFile(), JSON.stringify(lib)); } catch { /* yazılamazsa önemli değil */ }
 });
+// Okunamayan dosyalar hatırlanır: klasör tekrar eklenince aynı dosyalar yeniden denenmez.
+const failedFile = () => path.join(app.getPath('userData'), 'library-failed.json');
+const readFailed = () => { try { const l = JSON.parse(fs.readFileSync(failedFile(), 'utf8')); return Array.isArray(l) ? l : []; } catch { return []; } };
+ipcMain.handle('library-mark-failed', (_e, file) => {
+  const list = readFailed();
+  if (typeof file === 'string' && !list.includes(file)) {
+    list.push(file);
+    try { fs.writeFileSync(failedFile(), JSON.stringify(list.slice(-2000))); } catch { /* yazılamazsa önemli değil */ }
+  }
+});
+ipcMain.handle('library-failed-list', () => readFailed());
 ipcMain.handle('library-list', () => Object.values(readLibrary()).filter((e) => fs.existsSync(e.path)));
 
 // Kütüphaneye eklemek için klasör seçtirir ve içindeki (alt klasörler dahil) ses dosyalarını listeler.

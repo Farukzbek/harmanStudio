@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('harman', {
   chooseFormat: (message, detail) => ipcRenderer.invoke('choose-format', { message, detail }),
   libraryUpsert: (entry) => ipcRenderer.invoke('library-upsert', entry),
   libraryPickFolder: () => ipcRenderer.invoke('library-pick-folder'),
+  libraryMarkFailed: (file) => ipcRenderer.invoke('library-mark-failed', file),
+  libraryFailedList: () => ipcRenderer.invoke('library-failed-list'),
   libraryList: () => ipcRenderer.invoke('library-list'),
   engineStatus: () => ipcRenderer.invoke('engine-status'),
   installEngine: () => ipcRenderer.invoke('engine-install'),
