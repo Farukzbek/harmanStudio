@@ -35,7 +35,7 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 
 **Ses ve karışım**
 - Parça başına ses seviyesi (dB) ve sol / sağ denge. Birden çok parça seçiliyken seviye, denge ve fade hepsine birlikte uygulanır
-- Seviye eşitleme: seçili parçaların ses yüksekliğini birbirine yaklaştırır (iki şarkıdan biri diğerinden yüksek çıkmasın)
+- Seviye eşitleme: seçili parçaların ses yüksekliğini (LUFS, kapılı ölçüm) birbirine yaklaştırır; iki şarkıdan biri diğerinden yüksek çıkmasın
 - Vokal / enstrüman ayırma: vokal, davul, bas, diğer. Her ses parçasının seviyesi ve sol/sağ dengesi ayrı; "Sadece vokal" / "Vokalsiz" ön ayarları
 - Zamanlı geçişler (her ses parçası için ayrı): şarkının istediğin saniyeleri arasında seviyeyi bir yüzdeden başka bir yüzdeye (artan veya azalan) ve istersen yönü (sol/sağ) kademeli olarak götür. Ör. davul 54. saniyeden 75. saniyeye %12'den %86'ya yükselsin, sol kulaktan sağ kulağa geçsin
 - Zamanlı geçişleri **grafikte çiz**: ses parçasının "Zamanlı geçişler" bölümündeki grafikte çizgi sürükleyerek geçiş oluştur, uçlardaki noktaları sürükleyerek ayarla, çift tıklayarak sil (formla saniye yazmak da mümkün)
@@ -47,6 +47,8 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Otomatik BPM, ton (Camelot koduyla) ve ilk vuruş analizi; klip başlığında "124 BPM · 8A" etiketi
 - Bir parçayı diğerinin tempoyuna ve tonuna getir (Rubber Band ile), vuruşları hizala
 - **Şarkıları otomatik sırala ve karıştır** (Düzen menüsü): önce bir pencere açılır; dahil edilecek şarkıları seçersin, ilk çalacak olanı işaretlersin, tempo/tonca çok uyumsuz şarkıların atlanmasını ve hedef süreyi (ör. 45 dk) belirlersin, sıra canlı önizlenir. Sonra her çift için en iyi geçiş uygulanır; tek geri alma adımıdır
+- **Fade eğrisi:** eşit güç (varsayılan), doğrusal ya da yumuşak; parça başına yan panelden, geçişlerde geçiş bölümünden seçilir
+- **Filtre süpürmesi:** geçişte çıkan parça incelerek uzaklaşır (yüksek geçiren süpürme), giren parça perde açılır gibi parlar (alçak geçiren süpürme)
 - **Geçiş şablonları:** uzunluk, bas takası, tempo ve ton eşitleme ayarlarını hazır ya da kendi şablonlarınla tek tıkla uygula
 - **Uyumlu şarkılar:** Harman analiz ettiği her şarkıyı hatırlar (bu bilgisayarda, dosya yoluyla); "Müzik klasörü ekle" ile bir klasörü arka planda analiz ettirip kütüphaneyi hızla doldurabilirsin (yalnızca BPM / ton bilgisi saklanır). Bir parçayı seçip "Kütüphanede uyumlu şarkı bul"a basınca tempo ve tonca en yakın şarkıları önerir, tek tıkla projeye ekler
 - Akıllı geçiş önerileri: iki parça için en iyi 3 geçişi önerir ve tek tıkla uygular. Geçiş uzunluğu 8 / 16 / 32 vuruş seçilebilir
@@ -64,7 +66,7 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - **Mix'i parçalara bölerek kaydet** (Dosya menüsü): işaretçilerden ya da parçalar arasındaki geçişlerin ortasından her şarkıyı ayrı dosya yapar ("01 - şarkı adı"), MP3 ya da WAV
 - **Ses parçalarını ayrı kaydet:** vokal, davul, bas, diğer için mix'in tamamını (kesimler, geçişler, seviyeler dahil) yalnızca o ses parçasıyla ayrı dosyalara yazar
 - Çıktı biçimi kaydederken sorulur: **MP3** (320 kbps) ya da **WAV** (kayıpsız); son seçtiğin bir sonraki sefer varsayılan olur. Normalize üst çubuktaki düğmeden açılır/kapanır
-- İsteğe bağlı normalize: mix'in en yüksek ses tepesini −1 dB'e ayarlar
+- Normalize: mix'in ses yüksekliğini **−14 LUFS**'a getirir (YouTube, Spotify ve arabada dinleme standardı; EBU R128 / ITU-R BS.1770 ölçümü) ve tepeleri −1 dB'in altında tutan bir **sınırlayıcı (limiter)** uygular. Kayıt sonrası sonuç bildirilir (ör. "−14,0 LUFS, tepeler en çok 2,1 dB sınırlandı")
 
 ## Gereksinimler
 
@@ -219,7 +221,7 @@ src/tempo.js           Tempo / ton aracı (Rubber Band) yönetimi
 src/pyenv.js           Python ortamı kurma ve süreç çalıştırma yardımcıları
 src/saveformat.js      Kaydetme yolundan biçim çıkarma
 src/projectfile.js     Proje dosyası ve yan ses dosyaları için güvenli (geçici dosya + yeniden adlandırma) yazma
-src/renderer/          Arayüz: index.html, style.css, app.js (zaman çizelgesi, ses motoru), analysis.js (BPM / ton / enerji), transitions.js (geçiş önerileri), tour.js (giriş rehberi)
+src/renderer/          Arayüz: index.html, style.css; app/*.js (uygulama mantığı, bölümlere ayrılmış klasik betikler: çekirdek, zaman çizelgesi, yan panel, düzenleme, ses motoru, tempo/ton, araçlar, proje, olaylar…); analysis.js (BPM / ton / enerji), mastering.js (LUFS ve limiter), transitions.js (geçiş önerileri, sıralama, bölme planı), tour.js (giriş rehberi)
 test/                  Birim testleri (node --test)
 tools/separate.py      Ayırma motorunu bellek sınırıyla başlatır
 tools/stretch.py       Tempo / ton değiştirme (pedalboard / Rubber Band)
