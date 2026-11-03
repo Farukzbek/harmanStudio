@@ -232,6 +232,14 @@
                   <input id="trans-template-name" type="text" maxlength="40" placeholder="Şablon adı" aria-label="Şablon adı" autocomplete="off" spellcheck="false">
                   <button id="trans-template-ok" class="btn solid mini">Kaydet</button>
                 </div>
+                <div class="seg-row">
+                  <span>Eğri</span>
+                  <select id="trans-curve" aria-label="Geçiş fade eğrisi" title="Geçişte kullanılacak fade eğrisi">
+                    <option value="power">Eşit güç</option>
+                    <option value="linear">Doğrusal</option>
+                    <option value="smooth">Yumuşak</option>
+                  </select>
+                </div>
                 <div class="match-line">
                   <button id="trans-bass" class="switch" role="switch" aria-checked="true" aria-label="Bas takası"><i></i></button>
                   <span title="Geçişin ortasında çıkan parçanın basını kısar, giren parçanın basını açar">Bas takası (DJ geçişi)</span>
@@ -288,6 +296,14 @@
             <label for="ins-fadeout">Fade out</label>
             <output id="ins-fadeout-val"></output>
             <input id="ins-fadeout" type="range" min="0" max="200" value="0" data-default="0">
+          </div>
+          <div class="inline-row">
+            <label for="ins-curve">Eğri</label>
+            <select id="ins-curve" aria-label="Fade eğrisi" title="Eşit güç: ilişkisiz parçalarda ses çukuru olmaz. Doğrusal: aynı kaynaktan parçalarda. Yumuşak: orta kısımda hızlı geçiş">
+              <option value="power">Eşit güç</option>
+              <option value="linear">Doğrusal</option>
+              <option value="smooth">Yumuşak</option>
+            </select>
           </div>
         </section>
 

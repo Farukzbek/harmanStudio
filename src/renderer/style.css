@@ -956,3 +956,5 @@ input[type="range"]:disabled { opacity: 0.45; }
 .am-actions { margin-top: 10px; justify-content: flex-end; }
 
 #lib-folder { margin-top: 6px; }
+
+.seg-row select { flex: 1; min-width: 0; height: 26px; padding: 0 4px 0 6px; }

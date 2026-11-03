@@ -158,7 +158,18 @@
     return picked;
   }
 
-  const api = { suggestTransitions, meanEnergy };
+  // Fade / crossfade eğrileri: u (0..1) → kazanç. Çıkış fade'i aynı eğrinin tersidir (1 − u).
+  //   power  : eşit güç (sin): ilişkisiz iki parçada geçişte ses çukuru olmaz (varsayılan)
+  //   linear : doğrusal: aynı kaynaktan iki kopya / vuruşu hizalı parçalarda genlik toplamı sabit
+  //   smooth : sin²: yumuşak giriş ve çıkış, geçişin ortasında daha hızlı değişir
+  const FADE_CURVES = {
+    power: (u) => Math.sin((u * Math.PI) / 2),
+    linear: (u) => u,
+    smooth: (u) => Math.sin((u * Math.PI) / 2) ** 2,
+  };
+  const fadeShape = (curve, u) => (FADE_CURVES[curve] || FADE_CURVES.power)(clamp(u, 0, 1));
+
+  const api = { suggestTransitions, meanEnergy, fadeShape, FADE_CURVES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Transitions = api;
 }(typeof window !== 'undefined' ? window : globalThis));

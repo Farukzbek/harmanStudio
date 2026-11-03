@@ -19,7 +19,7 @@ const SNAP_PX = 8;
 const PPS_MIN = 0.5;            // yakınlık: saniye başına piksel
 const PPS_MAX = 240;
 const UNDO_LIMIT = 100;
-const PARAM_KEYS = ['id', 'srcId', 'name', 'track', 'start', 'offset', 'dur', 'fadeIn', 'fadeOut', 'gain', 'stemGains', 'pan', 'stemPans', 'stemRamps', 'eqLow', 'eqHigh', 'bassSwap', 'hue', 'mute', 'solo'];
+const PARAM_KEYS = ['id', 'srcId', 'name', 'track', 'start', 'offset', 'dur', 'fadeIn', 'fadeOut', 'gain', 'stemGains', 'pan', 'stemPans', 'stemRamps', 'eqLow', 'eqHigh', 'bassSwap', 'hue', 'mute', 'solo', 'curve'];
 const STEM_ORDER = ['vocals', 'instrumental', 'drums', 'bass', 'guitar', 'piano', 'other'];
 const STEM_LABELS = {
   vocals: 'Vokal', instrumental: 'Enstrüman', drums: 'Davul', bass: 'Bas',
@@ -78,7 +78,7 @@ const el = {
   matchKey: $('match-key'), matchKeyText: $('match-key-text'),
   semiMinus: $('semi-minus'), semiPlus: $('semi-plus'), matchWarn: $('match-warn'),
   matchApply: $('match-apply'), matchAlign: $('match-align'), matchReset: $('match-reset'),
-  projectName: $('project-name'), history: $('history'), historyList: $('history-list'), meterBar: $('st-meter-bar'), peakText: $('st-peak'), meter: $('st-meter'), libFind: $('lib-find'), libFolder: $('lib-folder'), libList: $('lib-list'), libHint: $('lib-hint'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
+  projectName: $('project-name'), insCurve: $('ins-curve'), transCurve: $('trans-curve'), history: $('history'), historyList: $('history-list'), meterBar: $('st-meter-bar'), peakText: $('st-peak'), meter: $('st-meter'), libFind: $('lib-find'), libFolder: $('lib-folder'), libList: $('lib-list'), libHint: $('lib-hint'), transTemplate: $('trans-template'), tplSave: $('trans-template-save'), tplDel: $('trans-template-del'), tplForm: $('trans-template-form'), tplName: $('trans-template-name'), tplOk: $('trans-template-ok'), insMute: $('ins-mute'), insSolo: $('ins-solo'), stProject: $('st-project'), stSelection: $('st-selection'), stModes: $('st-modes'), insColors: $('ins-colors'), loopBand: $('loop-band'), insMulti: $('ins-multi'), insBass: $('ins-bass'), insBassVal: $('ins-bass-val'), insTreble: $('ins-treble'), insTrebleVal: $('ins-treble-val'), insSwap: $('ins-swap'), transBass: $('trans-bass'), insLevel: $('ins-level'), transBeats: $('trans-beats'), transFind: $('trans-find'), transList: $('trans-list'),
 };
 
 // ------------------------------------------------------- ayrılmış ses parçaları
@@ -532,8 +532,8 @@ function drawClip(clip) {
     g.lineWidth = 1.5 * dpr;
     g.stroke();
   };
-  drawFade(0, clip.fadeIn * pps, (u) => Math.sin((u * Math.PI) / 2));
-  drawFade(wPx - clip.fadeOut * pps, wPx, (u) => Math.cos((u * Math.PI) / 2));
+  drawFade(0, clip.fadeIn * pps, (u) => Transitions.fadeShape(clip.curve, u));
+  drawFade(wPx - clip.fadeOut * pps, wPx, (u) => Transitions.fadeShape(clip.curve, 1 - u));
 
   // Zamanlı seviye geçişleri olan ses parçalarının eğrisi (parçanın rengiyle).
   if (hasStems(clip)) {
@@ -816,6 +816,7 @@ function updateInspector() {
   el.insBassVal.textContent = dbText(clip.eqLow || 0);
   el.insTrebleVal.textContent = dbText(clip.eqHigh || 0);
   el.insSwap.setAttribute('aria-checked', String(!!clip.bassSwap));
+  el.insCurve.value = clip.curve || 'power';
   el.insMute.setAttribute('aria-pressed', String(!!clip.mute));
   el.insSolo.setAttribute('aria-pressed', String(!!clip.solo));
   [el.insBass, el.insTreble].forEach(paintSlider);
@@ -1390,9 +1391,19 @@ el.insSwap.addEventListener('click', () => {
   updateInspector();
   onEdited();
 });
+el.transCurve.addEventListener('change', () => { tempo.curve = el.transCurve.value; });
 el.transBass.addEventListener('click', () => {
   tempo.bassSwap = !tempo.bassSwap;
   el.transBass.setAttribute('aria-checked', String(tempo.bassSwap));
+});
+
+// Fade eğrisi: seçili tüm parçalara uygulanır.
+el.insCurve.addEventListener('change', () => {
+  if (!selected()) return;
+  const v = el.insCurve.value === 'power' ? undefined : el.insCurve.value;
+  mutate(() => { for (const c of selectedClips()) c.curve = v; });
+  layoutAll();
+  onEdited();
 });
 
 // Sessize al / solo: seçili tüm parçalara uygulanır; çalıyorsa ses hemen güncellenir.
@@ -1945,8 +1956,8 @@ function envelopeAt(clip, t) {
   const x = t - clip.start;
   const r = clip.dur - x;
   let g = clip.gain;
-  if (x < fi) g *= Math.sin((Math.max(x, 0) / fi) * Math.PI / 2);
-  if (r < fo) g *= Math.sin((Math.max(r, 0) / fo) * Math.PI / 2);
+  if (x < fi) g *= Transitions.fadeShape(clip.curve, Math.max(x, 0) / fi);
+  if (r < fo) g *= Transitions.fadeShape(clip.curve, Math.max(r, 0) / fo);
   return g;
 }
 
@@ -2585,7 +2596,7 @@ async function startSeparate() {
 // Bir "kaynak" (state.sources) tek bir ses dosyasıdır. Tempo/ton değiştirilince orijinalden
 // yeni bir kaynak türetilir (origin: { srcId, rate, semis }); klip bu kaynağa geçer. Hep
 // orijinalden işlenir, böylece tekrar tekrar uygulamak sesi katman katman bozmaz.
-const tempo = { bassSwap: true, fadeBeats: 16, refId: null, forClip: null, doTempo: true, doKey: true, semis: 0, semisManual: false, optionsKey: '' };
+const tempo = { curve: 'power', bassSwap: true, fadeBeats: 16, refId: null, forClip: null, doTempo: true, doKey: true, semis: 0, semisManual: false, optionsKey: '' };
 let analysisQueue = Promise.resolve();
 
 function queueAnalysis(srcId) {
@@ -2984,7 +2995,7 @@ function isPristine(clip) {
   return !src.origin && clip.offset === 0
     && Math.abs(clip.dur - root.buffer.duration) < 0.001
     && clip.gain === 1 && clip.fadeIn === 0 && clip.fadeOut === 0 && stemsDefault
-    && !clip.eqLow && !clip.eqHigh && !clip.bassSwap
+    && !clip.eqLow && !clip.eqHigh && !clip.bassSwap && !clip.curve
     && !clip.pan && !clip.stemRamps && Object.values(clip.stemPans || {}).every((v) => v === 0);
 }
 
@@ -3001,7 +3012,7 @@ function resetSong() {
       srcId: rootId, buffer: root.buffer, peaks: root.peaks,
       start: Math.max(0, clip.start - clip.offset), offset: 0, dur: root.buffer.duration,
       fadeIn: 0, fadeOut: 0, gain: 1, pan: 0, stemPans: undefined, stemRamps: undefined,
-      eqLow: undefined, eqHigh: undefined, bassSwap: undefined,
+      eqLow: undefined, eqHigh: undefined, bassSwap: undefined, curve: undefined,
       stemGains: root.stems ? Object.fromEntries(Object.keys(root.stems).map((n) => [n, 1])) : undefined,
     });
   });
@@ -3032,7 +3043,7 @@ function copySelected() {
   if (!chosen.length) return toast('Önce bir parça seç');
   state.clipboard = chosen.map((c) => ({
     srcId: c.srcId, name: c.name, track: c.track, start: c.start, offset: c.offset, dur: c.dur,
-    fadeIn: c.fadeIn, fadeOut: c.fadeOut, gain: c.gain, pan: c.pan, hue: c.hue, mute: c.mute, solo: c.solo, eqLow: c.eqLow, eqHigh: c.eqHigh, bassSwap: c.bassSwap, ...copyMixParams(c),
+    fadeIn: c.fadeIn, fadeOut: c.fadeOut, gain: c.gain, pan: c.pan, hue: c.hue, mute: c.mute, solo: c.solo, curve: c.curve, eqLow: c.eqLow, eqHigh: c.eqHigh, bassSwap: c.bassSwap, ...copyMixParams(c),
   }));
   toast(chosen.length > 1 ? `${chosen.length} parça kopyalandı` : 'Parça kopyalandı');
 }
@@ -3330,6 +3341,7 @@ async function applyTransition(s, aId, bId, listen, { inBusy = false } = {}) {
       b.fadeIn = fade;
       limitFades(b, 'fadeIn');
       if (tempo.bassSwap) { a.bassSwap = true; b.bassSwap = true; }
+      a.curve = b.curve = tempo.curve === 'power' ? undefined : tempo.curve;
       if (b.track === a.track) {                              // iki parça aynı hatta olmasın
         b.track = [0, 1, 2, 3].find((t) => t !== a.track);
         laneOf(b.track).appendChild(b.el);
@@ -3569,7 +3581,7 @@ function renderTemplateOptions(selectName = '') {
 }
 
 function currentTemplateSettings() {
-  return { fadeBeats: tempo.fadeBeats, bassSwap: tempo.bassSwap, doTempo: tempo.doTempo, doKey: tempo.doKey };
+  return { fadeBeats: tempo.fadeBeats, bassSwap: tempo.bassSwap, doTempo: tempo.doTempo, doKey: tempo.doKey, curve: tempo.curve };
 }
 
 function applyTemplate(t) {
@@ -3577,6 +3589,8 @@ function applyTemplate(t) {
   tempo.bassSwap = !!t.bassSwap;
   tempo.doTempo = !!t.doTempo;
   tempo.doKey = !!t.doKey;
+  tempo.curve = t.curve || 'power';
+  el.transCurve.value = tempo.curve;
   el.transBeats.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.beats) === tempo.fadeBeats)));
   el.transBass.setAttribute('aria-checked', String(tempo.bassSwap));
   updateInspector();
@@ -4299,6 +4313,7 @@ const CHANGE_LABELS = [
   [['gain'], 'Seviye'],
   [['pan'], 'Sol / sağ denge'],
   [['fadeIn', 'fadeOut'], 'Fade'],
+  [['curve'], 'Fade eğrisi'],
   [['stemRamps'], 'Zamanlı geçiş'],
   [['stemGains', 'stemPans'], 'Ses parçası ayarı'],
   [['eqLow', 'eqHigh', 'bassSwap'], 'EQ / bas takası'],

@@ -45,3 +45,18 @@ test('minPlayed: A en az o kadar çaldıktan sonra geçilir', () => {
   assert.ok(Math.min(...early.map((s) => s.aPoint)) < 24, 'kısıtsız öneri erken bir nokta içermeli');
   for (const s of late) assert.ok(s.aPoint >= 24 - 1e-6, `aPoint ${s.aPoint}`);
 });
+
+test('Fade eğrileri: uç değerler ve toplam özellikleri', () => {
+  const f = (c, u) => Transitions.fadeShape(c, u);
+  for (const c of ['power', 'linear', 'smooth']) {
+    assert.ok(Math.abs(f(c, 0)) < 1e-9 && Math.abs(f(c, 1) - 1) < 1e-9, `${c} uçları`);
+  }
+  for (let u = 0; u <= 1; u += 0.1) {
+    assert.ok(Math.abs(f('power', u) ** 2 + f('power', 1 - u) ** 2 - 1) < 1e-9, 'eşit güç: karelerin toplamı 1');
+    assert.ok(Math.abs(f('linear', u) + f('linear', 1 - u) - 1) < 1e-9, 'doğrusal: toplam 1');
+    assert.ok(Math.abs(f('smooth', u) + f('smooth', 1 - u) - 1) < 1e-9, 'yumuşak: toplam 1');
+  }
+  assert.strictEqual(f(undefined, 0.5), f('power', 0.5));            // bilinmeyen / boş → eşit güç
+  assert.strictEqual(f('linear', -1), 0);                              // sınırlandırma
+  assert.strictEqual(f('linear', 2), 1);
+});
