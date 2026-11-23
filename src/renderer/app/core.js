@@ -308,7 +308,68 @@ function setTheme(name, { save = true } = {}) {
   const key = THEMES[name] ? name : 'siyah';
   document.documentElement.dataset.theme = key;
   themeCache = {};
-  if (save) { try { localStorage.setItem('harman.theme', key); } catch { /* özel pencere */ } }
+  if (save) { settings.theme = key; saveSettings(); }
   window.harman.themeSet(key, getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()).catch(() => {});
   if (typeof drawRuler === 'function' && el?.rulerCanvas) { drawRuler(); redrawVisible(); }
 }
+
+// ---------------------------------------------------------------- ayarlar
+// Uygulama ayarları bu bilgisayarda saklanır (localStorage). Varsayılanlar: siyah tema, −14 LUFS, 320 kbps, 15 sn yedek.
+const SETTINGS_DEFAULTS = { theme: 'siyah', snap: true, lufs: -14, kbps: 320, autosaveSec: 15 };
+const settings = { ...SETTINGS_DEFAULTS };
+try { Object.assign(settings, JSON.parse(localStorage.getItem('harman.settings') || '{}')); } catch { /* özel pencere */ }
+try { const legacy = localStorage.getItem('harman.theme'); if (legacy && THEMES[legacy]) settings.theme = legacy; } catch { /* özel pencere */ }
+state.snapBeats = !!settings.snap;
+function saveSettings() { try { localStorage.setItem('harman.settings', JSON.stringify(settings)); } catch { /* özel pencere */ } }
+
+function togglePanel(show) {
+  const hidden = document.body.classList.contains('no-inspector');
+  const next = show ?? hidden;                 // show verilmezse tersine çevir
+  document.body.classList.toggle('no-inspector', !next);
+  $('btn-panel').setAttribute('aria-pressed', String(next));
+  try { localStorage.setItem('harman.panel', next ? '1' : '0'); } catch { /* özel pencere */ }
+  if (typeof layoutAll === 'function') requestAnimationFrame(() => layoutAll());
+}
+try { if (localStorage.getItem('harman.panel') === '0') togglePanel(false); } catch { /* özel pencere */ }
+$('btn-panel').addEventListener('click', () => togglePanel());
+
+function fillSettingsForm() {
+  const sel = $('set-theme');
+  if (!sel.options.length) for (const [k, v] of Object.entries(THEMES)) sel.add(new Option(v, k));
+  sel.value = settings.theme;
+  $('set-snap').checked = !!settings.snap;
+  $('set-lufs').value = String(settings.lufs);
+  $('set-kbps').value = String(settings.kbps);
+  $('set-autosave').value = String(settings.autosaveSec);
+}
+function toggleSettings(show = $('settings').hidden) {
+  $('settings').hidden = !show;
+  if (show) fillSettingsForm();
+}
+$('btn-settings').addEventListener('click', () => toggleSettings(true));
+$('settings-close').addEventListener('click', () => toggleSettings(false));
+$('settings').addEventListener('pointerdown', (e) => { if (e.target === $('settings')) toggleSettings(false); });
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('settings').hidden) { e.stopPropagation(); toggleSettings(false); } }, true);
+$('set-theme').addEventListener('change', () => { settings.theme = $('set-theme').value; saveSettings(); setTheme(settings.theme); });
+$('set-snap').addEventListener('change', () => {
+  settings.snap = $('set-snap').checked;
+  state.snapBeats = settings.snap;
+  saveSettings();
+  window.harman.snapSet(settings.snap).catch(() => {});
+  if (typeof updateStatus === 'function') updateStatus();
+});
+$('set-lufs').addEventListener('change', () => { settings.lufs = Number($('set-lufs').value); saveSettings(); });
+$('set-kbps').addEventListener('change', () => { settings.kbps = Number($('set-kbps').value); saveSettings(); });
+$('set-autosave').addEventListener('change', () => { settings.autosaveSec = Number($('set-autosave').value); saveSettings(); if (typeof restartAutosave === 'function') restartAutosave(); });
+$('set-tour').addEventListener('click', () => { toggleSettings(false); startTour(); });
+$('set-lib').addEventListener('click', async () => { await window.harman.libraryClear(); toast('Kütüphane temizlendi'); });
+$('set-reset').addEventListener('click', () => {
+  Object.assign(settings, SETTINGS_DEFAULTS);
+  saveSettings();
+  setTheme(settings.theme);
+  state.snapBeats = settings.snap;
+  window.harman.snapSet(settings.snap).catch(() => {});
+  restartAutosave();
+  fillSettingsForm();
+  toast('Ayarlar varsayılana döndü');
+});

@@ -62,6 +62,8 @@ contextBridge.exposeInMainWorld('harman', {
   setTitle: (title) => ipcRenderer.invoke('set-title', title),
   onCloseRequest: (cb) => { ipcRenderer.on('close-request', () => cb()); },
   themeSet: (name, bg) => ipcRenderer.invoke('theme-set', { name, bg }),
+  snapSet: (on) => ipcRenderer.invoke('snap-set', on),
+  libraryClear: () => ipcRenderer.invoke('library-clear'),
   recentAdd: (file) => ipcRenderer.invoke('recent-add', file),
   takePendingOpen: () => ipcRenderer.invoke('take-pending-open'),
   onOpenProject: (cb) => { ipcRenderer.on('open-project', (_e, file) => cb(file)); },

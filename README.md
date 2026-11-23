@@ -26,6 +26,8 @@ Basit, ücretsiz, reklamsız ve açık kaynaklı müzik karıştırma aracı (ma
 - Parçayı yeniden adlandır (başlığa çift tıkla ya da **F2**) ve parçaya kendi rengini ver (yan panel)
 - Alt çubuk: parça sayısı, mix süresi, seçili parçanın özeti (BPM, ton, süre) ve açık kipler
 - Vuruşa yapışma: bölme (**S**), başı/sonu çizgiye kırpma (**Q** / **W**) ve kenar sürükleyerek kırpma, parçanın en yakın vuruşuna oturur. Görünüm → Vuruşa Yapış ile kapatılır; sürüklerken ⌘ basılıysa da devre dışıdır
+- Ayarlar (⌘, ya da üst çubuktaki dişli): tema, vuruşa yapış, normalize hedefi (−16 … −9 LUFS), MP3 kalitesi (192/256/320 kbps), otomatik yedek aralığı; giriş rehberini yeniden açma, kütüphaneyi temizleme, varsayılanlara dönme
+- Yan paneli gizle / göster (⌥⌘I ya da üst çubuktaki düğme); durum hatırlanır
 - Temalar (Görünüm → Tema): Siyah (varsayılan), Kömür, Gece mavisi, Orman, Açık; seçim hatırlanır
 - Pencere boyutu ve konumu hatırlanır
 - Döngüde dinleme (**L**): seçili parçayı ya da uyguladığın geçişi tekrar tekrar çal; geçiş uygularken "Uygula ve döngüde dinle" geçiş bölgesini döngüye alır

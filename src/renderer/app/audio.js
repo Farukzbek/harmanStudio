@@ -357,7 +357,6 @@ const lastFormat = () => { try { return localStorage.getItem('harman.lastFormat'
 
 // Mix'i çevrimdışı çizer. normalize: ses yüksekliğini LUFS hedefine getirir ve tepeleri sınırlar (mastering.js).
 // stemOnly: yalnızca bir ses parçası. Normalize bilgisi lastMaster'a yazılır.
-const MASTER_TARGET_LUFS = -14;
 const MASTER_CEILING_DB = -1;
 let lastMaster = null;
 async function renderMix({ normalize = state.normalize, stemOnly = null } = {}) {
@@ -368,7 +367,7 @@ async function renderMix({ normalize = state.normalize, stemOnly = null } = {}) 
   lastMaster = null;
   if (normalize) {
     const channels = [rendered.getChannelData(0), rendered.getChannelData(1)];
-    lastMaster = Mastering.normalizeLoudness(channels, SAMPLE_RATE, { targetLufs: MASTER_TARGET_LUFS, ceilingDb: MASTER_CEILING_DB });
+    lastMaster = Mastering.normalizeLoudness(channels, SAMPLE_RATE, { targetLufs: settings.lufs, ceilingDb: MASTER_CEILING_DB });
   }
   return rendered;
 }
@@ -386,7 +385,7 @@ async function exportMix() {
   try {
     toast('Mix hazırlanıyor...');
     const rendered = await renderMix();
-    const saved = await window.harman.saveMix(encodeWav(rendered), `${state.clips[0].name} mix`, lastFormat(), 320);
+    const saved = await window.harman.saveMix(encodeWav(rendered), `${state.clips[0].name} mix`, lastFormat(), settings.kbps);
     if (saved) {
       try { localStorage.setItem('harman.lastFormat', /\.wav$/i.test(saved) ? 'wav' : 'mp3'); } catch { /* özel pencere */ }
       toast(`Kaydedildi: ${saved}${masterNote()}`);
@@ -437,7 +436,7 @@ async function exportSplit() {
     const width = String(plan.length).length;
     const files = plan.map((p, i) => ({ name: `${String(i + 1).padStart(Math.max(2, width), '0')} - ${p.name}`, wav: encodeWav(sliceBuffer(rendered, p.t0, p.t1)) }));
     setSepProgress({ text: format === 'mp3' ? 'Dosyalar MP3\'e çevriliyor' : 'Dosyalar yazılıyor' });
-    const done = await window.harman.saveBatch(files, format, 320, 'Bölünmüş mix için klasör seç');
+    const done = await window.harman.saveBatch(files, format, settings.kbps, 'Bölünmüş mix için klasör seç');
     state.lastBatch = done;
   });
   if (ok && state.lastBatch) { toast(`${state.lastBatch.count} dosya kaydedildi: ${state.lastBatch.dir}`); state.lastBatch = null; }
@@ -461,7 +460,7 @@ async function exportStems() {
       files.push({ name: `${mixBaseName()} - ${STEM_LABELS[names[i]] || names[i]}`, wav: encodeWav(rendered) });
     }
     setSepProgress({ text: 'Dosyalar yazılıyor' });
-    state.lastBatch = await window.harman.saveBatch(files, format, 320, 'Ses parçaları için klasör seç');
+    state.lastBatch = await window.harman.saveBatch(files, format, settings.kbps, 'Ses parçaları için klasör seç');
   });
   if (ok && state.lastBatch) { toast(`${state.lastBatch.count} dosya kaydedildi: ${state.lastBatch.dir}`); state.lastBatch = null; }
 }

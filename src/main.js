@@ -122,6 +122,8 @@ function buildMenu() {
       submenu: [
         { role: 'about', label: 'Harman Hakkında' },
         sep,
+        item('Ayarlar…', 'settings', 'CmdOrCtrl+,'),
+        sep,
         { role: 'hide', label: 'Harman\'ı Gizle' },
         { role: 'hideOthers', label: 'Diğerlerini Gizle' },
         { role: 'unhide', label: 'Tümünü Göster' },
@@ -199,6 +201,7 @@ function buildMenu() {
         item('Yakınlaştır', 'zoom-in', 'CmdOrCtrl+='),
         item('Uzaklaştır', 'zoom-out', 'CmdOrCtrl+-'),
         item('Tümünü Sığdır', 'fit', 'CmdOrCtrl+0'),
+        item('Yan Paneli Gizle / Göster', 'toggle-panel', 'Alt+CmdOrCtrl+I'),
         {
           label: 'Tema',
           submenu: Object.entries(THEME_LABELS).map(([key, label]) => ({
@@ -424,6 +427,10 @@ ipcMain.handle('theme-set', (e, { name, bg }) => {
   menuState.theme = name;
   if (/^#[0-9a-f]{6}$/i.test(bg || '')) winOf(e)?.setBackgroundColor(bg);
   if (changed) buildMenu();
+});
+ipcMain.handle('snap-set', (_e, on) => { if (menuState.snapBeats !== !!on) { menuState.snapBeats = !!on; buildMenu(); } });
+ipcMain.handle('library-clear', () => {
+  for (const f of [libraryFile(), failedFile()]) { try { fs.rmSync(f, { force: true }); } catch { /* yok */ } }
 });
 ipcMain.handle('recent-add', (_e, file) => addRecent(file));
 

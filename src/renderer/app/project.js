@@ -48,7 +48,6 @@ $('help-tour').addEventListener('click', () => { toggleHelp(false); startTour();
 // (kopyalanmaz); tempo/ton ile türetilmiş sesler ve ayrılmış parçalar 16-bit WAV olarak yan klasöre yazılır,
 // böylece açınca yeniden ayırmak ya da işlemek gerekmez. Otomatik yedek aynı biçimi kullanır.
 const PROJECT_VERSION = 1;
-const AUTOSAVE_MS = 15000;
 
 const project = {
   path: null,            // kayıtlı .harman dosyası (yoksa null)
@@ -205,7 +204,12 @@ async function autosave() {
     console.error('Otomatik yedek yazılamadı', err);
   }
 }
-setInterval(autosave, AUTOSAVE_MS);
+let autosaveTimer = null;
+function restartAutosave() {
+  clearInterval(autosaveTimer);
+  autosaveTimer = settings.autosaveSec > 0 ? setInterval(autosave, settings.autosaveSec * 1000) : null;
+}
+restartAutosave();
 
 // ---- açma
 const decodeBytes = (bytes) => ctx.decodeAudioData(bytes);
@@ -465,6 +469,8 @@ const actions = {
   delete: deleteSelected,
   play: togglePlay,
   loop: toggleLoop,
+  settings: () => toggleSettings(true),
+  'toggle-panel': () => togglePanel(),
   theme: (name) => setTheme(name),
   history: () => toggleHistory(true),
   'marker-add': () => addMarkerAt(state.playhead),
@@ -473,7 +479,7 @@ const actions = {
   'step-forward': () => movePlayhead(state.playhead + fineStep()),
   'edge-back': () => jumpToEdge(-1),
   'edge-forward': () => jumpToEdge(1),
-  'snap-beats': (value) => { state.snapBeats = value ?? !state.snapBeats; updateStatus(); toast(state.snapBeats ? 'Vuruşa yapışma açık' : 'Vuruşa yapışma kapalı'); },
+  'snap-beats': (value) => { state.snapBeats = value ?? !state.snapBeats; settings.snap = state.snapBeats; saveSettings(); updateStatus(); toast(state.snapBeats ? 'Vuruşa yapışma açık' : 'Vuruşa yapışma kapalı'); },
   automix,
   start: () => { goTo(0); el.timeline.scrollLeft = 0; },
   end: () => goTo(projectEnd()),

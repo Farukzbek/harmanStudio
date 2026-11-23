@@ -989,3 +989,18 @@ input[type="range"]:disabled { opacity: 0.45; }
 .clip { transition: box-shadow 0.12s ease; }
 .clip:hover { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18); }
 .clip.selected { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+
+/* yan paneli gizle */
+body.no-inspector .inspector { display: none; }
+#btn-panel[aria-pressed="false"] { color: var(--text-faint); }
+/* ayarlar */
+.set-list { display: grid; gap: 2px; margin: 6px 0 12px; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 4px; border-bottom: 1px solid var(--line-soft); color: var(--text); }
+.set-row small { display: block; margin-top: 1px; color: var(--text-faint); font-size: 10.5px; }
+.set-row select { min-width: 150px; }
+.set-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+.set-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 1080px) { #btn-panel { display: none; } }
+
+.zoom { flex: none; }
+.zoom input[type="range"] { flex: none; }
