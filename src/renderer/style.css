@@ -25,7 +25,7 @@
   --head-h: 18px;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
-:root[data-theme="komur"] { --bg: #121317; --panel: #1a1c21; --panel-2: #22252c; --lane: #16181c; --lane-alt: #181a1f; --line: #2a2d35; --line-soft: #23262d; --text-dim: #9097a3; --text-faint: #636975; --sunken: var(--sunken); --raised: var(--raised); --line-strong: var(--line-strong); --ruler-major: #4a4f5b; --ruler-minor: var(--line-strong); }
+:root[data-theme="komur"] { --bg: #121317; --panel: #1a1c21; --panel-2: #22252c; --lane: #16181c; --lane-alt: #181a1f; --line: #2a2d35; --line-soft: #23262d; --text-dim: #9097a3; --text-faint: #636975; --sunken: #14161a; --raised: #2a2e37; --line-strong: #383d49; --ruler-major: #4a4f5b; --ruler-minor: #343842; }
 :root[data-theme="gece"] { --bg: #0a0f1c; --panel: #111a2c; --panel-2: #18233a; --lane: #0d1424; --lane-alt: #0f1729; --line: #22304c; --line-soft: #1a2640; --text: #e6ecf7; --text-dim: #8a98b5; --text-faint: #5d6c8a; --accent: #5aa9ff; --accent-soft: rgba(90, 169, 255, 0.16); --sunken: #0a1120; --raised: #1f2c47; --line-strong: #324468; --ruler-major: #46587f; --ruler-minor: #2a3a5c; }
 :root[data-theme="orman"] { --bg: #0a100d; --panel: #111a15; --panel-2: #18241d; --lane: #0d1511; --lane-alt: #0f1813; --line: #22332a; --line-soft: #1a2820; --text: #e6efe9; --text-dim: #8fa398; --text-faint: #5f7367; --accent: #4fd29a; --accent-soft: rgba(79, 210, 154, 0.16); --sunken: #0a110d; --raised: #1f2e25; --line-strong: #324a3c; --ruler-major: #46675a; --ruler-minor: #2b4137; }
 :root[data-theme="acik"] { --bg: #e9ebf0; --panel: #f6f7f9; --panel-2: #e8eaee; --lane: #f0f1f4; --lane-alt: #eaecf0; --line: #d3d7df; --line-soft: #e0e3e9; --text: #1d2026; --text-dim: #566070; --text-faint: #8a91a0; --accent: #e5582a; --accent-soft: rgba(229, 88, 42, 0.14); --sunken: #e2e5eb; --raised: #dde1e8; --line-strong: #c3c9d3; --hover: rgba(0, 0, 0, 0.06); --ruler-major: #9aa1ae; --ruler-minor: #c9ced7; --danger: #d43c3c; }
@@ -52,8 +52,8 @@ html, body {
   z-index: 50;   /* ipucu kutuları yan panelin üstünde kalsın */
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 48px;
+  gap: 10px;
+  height: 52px;
   padding: 0 12px 0 84px; /* trafik ışıkları için boşluk */
   background: var(--panel);
   border-bottom: 1px solid var(--line);
@@ -275,7 +275,7 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(0.95); }
 input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px rgba(255, 122, 69, 0.7); }
 
 /* ----------------------------------------------------------- zaman çizelgesi */
-.workspace { display: flex; height: calc(100% - 48px - 24px); }
+.workspace { display: flex; height: calc(100% - 52px - 24px); }
 .statusbar { display: flex; align-items: center; gap: 14px; height: 24px; padding: 0 12px; background: var(--panel); border-top: 1px solid var(--line); color: var(--text-faint); font-size: 11px; white-space: nowrap; overflow: hidden; }
 .statusbar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-dim); }
 .statusbar b { font-weight: 500; color: var(--text-dim); font-variant-numeric: tabular-nums; }
@@ -1004,3 +1004,20 @@ body.no-inspector .inspector { display: none; }
 
 .zoom { flex: none; }
 .zoom input[type="range"] { flex: none; }
+
+/* ------------------------------------------------------------------ üst çubuk düzeni */
+.tb-pill { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 11px; background: var(--sunken); border: 1px solid var(--line-soft); }
+.tb-pill .icon-btn { width: 28px; height: 28px; border-radius: 8px; }
+.tb-pill .icon-btn.play { width: 34px; border-radius: 9px; }
+.tb-pill .zoom input[type="range"] { margin: 0 4px; }
+.transport.tb-pill { gap: 3px; }
+.zoom.tb-pill { padding: 3px 4px; }
+.tb-export { display: flex; align-items: center; gap: 12px; }
+.tb-export .btn.primary { height: 32px; padding: 0 14px 0 12px; gap: 7px; border-radius: 9px; font-weight: 600; }
+.tb-tools { padding: 3px; }
+.brand { gap: 9px; margin-right: 8px; }
+.brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.1px; }
+#btn-add { height: 32px; border-radius: 9px; }
+.lcd { border-radius: 11px; }
+@media (max-width: 1180px) { .tb-export { gap: 8px; } .zoom.tb-pill .icon-btn#zoom-fit { display: none; } }
+@media (max-width: 1080px) { .tb-export .btn.primary svg { display: none; } .topbar { gap: 6px; padding-right: 8px; } .tb-pill .icon-btn { width: 26px; } }
