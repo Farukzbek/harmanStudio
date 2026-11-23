@@ -357,10 +357,39 @@ function updateTrackWidth() {
   el.tracks.style.width = `${laneW}px`;
 }
 
+// Geçiş bölgeleri: farklı hatlardaki iki parçanın üst üste bindiği aralık, iki hattı kapsayan hafif bir bantla gösterilir.
+function updateXfades() {
+  el.tracks.querySelectorAll('.xfade').forEach((n) => n.remove());
+  const clips = state.clips;
+  for (let i = 0; i < clips.length; i++) {
+    for (let j = i + 1; j < clips.length; j++) {
+      const a = clips[i];
+      const b = clips[j];
+      if (a.track === b.track) continue;
+      const from = Math.max(a.start, b.start);
+      const to = Math.min(clipEnd(a), clipEnd(b));
+      if (to - from < 0.5) continue;
+      const lo = Math.min(a.track, b.track);
+      const hi = Math.max(a.track, b.track);
+      const band = document.createElement('div');
+      band.className = 'xfade';
+      band.style.setProperty('left', `${GUTTER + from * state.pps}px`);
+      band.style.setProperty('width', `${(to - from) * state.pps}px`);
+      band.style.setProperty('top', `${lo * TRACK_H}px`);
+      band.style.setProperty('height', `${(hi - lo + 1) * TRACK_H}px`);
+      const label = document.createElement('span');
+      label.textContent = `geçiş ${formatTime(to - from, 1)}`;
+      band.appendChild(label);
+      el.tracks.appendChild(band);
+    }
+  }
+}
+
 function layoutAll(skipDraw = false) {
   updateTrackWidth();
   state.clips.forEach(positionClip);
   updateLoopUI();
+  updateXfades();
   el.empty.hidden = state.clips.length > 0;
   el.total.textContent = `/ ${formatTime(projectEnd(), 2)}`;
   updatePlayheadUI();

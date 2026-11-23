@@ -958,3 +958,23 @@ input[type="range"]:disabled { opacity: 0.45; }
 #lib-folder { margin-top: 6px; }
 
 .seg-row select { flex: 1; min-width: 0; height: 26px; padding: 0 4px 0 6px; }
+
+/* ------------------------------------------------------------- görünüm cilası */
+/* katlanabilir yan panel bölümleri */
+.inspector h4.collapsible { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; padding: 4px 0; margin-bottom: 6px; border-radius: 4px; }
+.inspector h4.collapsible:hover { color: var(--text-dim); }
+.inspector h4.collapsible::before { content: ""; width: 5px; height: 5px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translate(-1px, -1px); transition: transform 0.15s ease; }
+.inspector section.collapsed > h4.collapsible::before { transform: rotate(-45deg); }
+.inspector section.collapsed > :not(h4) { display: none; }
+.inspector section { padding-bottom: 14px; border-bottom: 1px solid var(--line-soft); }
+.inspector section:last-child { border-bottom: 0; }
+.inspector section.collapsed { padding-bottom: 6px; }
+.swatches::before { content: "Renk"; flex-basis: 100%; margin-bottom: 1px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-faint); }
+
+/* zaman çizelgesi: hatlar ayırt edilsin, geçiş bölgesi görünsün */
+.track:nth-child(even) { background: rgba(255, 255, 255, 0.012); }
+.xfade { position: absolute; z-index: 2; pointer-events: none; border-left: 1px dashed rgba(255, 122, 69, 0.55); border-right: 1px dashed rgba(255, 122, 69, 0.55); background: linear-gradient(180deg, rgba(255, 122, 69, 0.10), rgba(255, 122, 69, 0.04)); }
+.xfade span { position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); padding: 1px 7px; border-radius: 8px; background: rgba(20, 22, 26, 0.85); color: var(--accent); font: 600 9.5px var(--mono); white-space: nowrap; }
+.clip { transition: box-shadow 0.12s ease; }
+.clip:hover { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.clip.selected { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
