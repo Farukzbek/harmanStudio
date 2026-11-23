@@ -32,7 +32,7 @@ async function startTour() {
     { targets: ['#inspector'], onEnter: () => document.body.classList.add('tour-demo-inspector'), onLeave: () => document.body.classList.remove('tour-demo-inspector'), title: 'Parça ayarları', html: '<p>Bir parçayı seçince burada: seviye, sol/sağ denge, bas ve tiz, BPM ve ton, başka bir parçaya tempo-ton eşleştirme, <b>Geçiş öner</b>, vokal/enstrüman ayırma ve fade.</p><p>Birden çok parça seçiliyse ayarlar hepsine birlikte uygulanır.</p>' },
     { targets: ['.switch-group', '#btn-export'], title: 'Kaydet ve dışa aktar', html: '<p>Normalize\'i aç ya da kapat ve <b>Mix\'i kaydet</b> düğmesine bas; MP3 mi WAV mı olacağını kaydetme penceresinde seçersin.</p><p><kbd>⌘S</kbd> projeni saklar; çalışırken 15 saniyede bir otomatik yedek alınır, beklenmedik kapanmada geri yüklenir.</p>' },
     { targets: ['#btn-help'], title: 'Kısayollar ve rehber', html: '<p>Tüm kısayollar ve hareketler burada (<kbd>⌘/</kbd>). Aynı pencerede <b>Rehberi başlat</b> düğmesi bu turu baştan açar; Yardım menüsünden de ulaşabilirsin.</p>' },
-    { title: 'Kurulum durumu', html: `${checks}<p>Hepsi bu kadar. İyi karışımlar!</p>` },
+    { title: 'Kurulum durumu', html: `${checks}<p>Hepsi bu kadar. İyi Harman'lar!</p>` },
   ];
   Tour.start(steps, {
     onEnd: (reason) => {
