@@ -465,6 +465,7 @@ const actions = {
   delete: deleteSelected,
   play: togglePlay,
   loop: toggleLoop,
+  theme: (name) => setTheme(name),
   history: () => toggleHistory(true),
   'marker-add': () => addMarkerAt(state.playhead),
   'open-recent': (file) => openProjectPath(file),

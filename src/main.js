@@ -51,7 +51,7 @@ function createWindow() {
     ...(saved ? { x: saved.x, y: saved.y } : {}),
     minWidth: 960,
     minHeight: 560,
-    backgroundColor: '#121317',
+    backgroundColor: '#050506',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     webPreferences: {
@@ -103,7 +103,8 @@ function addRecent(file) {
   app.addRecentDocument(file);
   buildMenu();
 }
-const menuState = { snapBeats: true };
+const menuState = { snapBeats: true, theme: 'siyah' };
+const THEME_LABELS = { siyah: 'Siyah', komur: 'Kömür', gece: 'Gece mavisi', orman: 'Orman', acik: 'Açık' };
 
 function buildMenu() {
   const send = (id) => (menuItem) => {
@@ -198,6 +199,13 @@ function buildMenu() {
         item('Yakınlaştır', 'zoom-in', 'CmdOrCtrl+='),
         item('Uzaklaştır', 'zoom-out', 'CmdOrCtrl+-'),
         item('Tümünü Sığdır', 'fit', 'CmdOrCtrl+0'),
+        {
+          label: 'Tema',
+          submenu: Object.entries(THEME_LABELS).map(([key, label]) => ({
+            label, type: 'radio', checked: menuState.theme === key,
+            click: () => BrowserWindow.getAllWindows()[0]?.webContents.send('menu', 'theme', key),
+          })),
+        },
         item('Vuruşa Yapış', 'snap-beats', null, { type: 'checkbox', checked: menuState.snapBeats }),
         sep,
         { role: 'togglefullscreen', label: 'Tam Ekran' },
@@ -409,6 +417,13 @@ ipcMain.handle('take-pending-open', () => {
   const file = pendingOpen;
   pendingOpen = null;
   return file;
+});
+ipcMain.handle('theme-set', (e, { name, bg }) => {
+  if (!THEME_LABELS[name]) return;
+  const changed = menuState.theme !== name;
+  menuState.theme = name;
+  if (/^#[0-9a-f]{6}$/i.test(bg || '')) winOf(e)?.setBackgroundColor(bg);
+  if (changed) buildMenu();
 });
 ipcMain.handle('recent-add', (_e, file) => addRecent(file));
 

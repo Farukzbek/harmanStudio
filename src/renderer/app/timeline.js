@@ -272,7 +272,7 @@ function drawRuler() {
   const g = cv.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, w, RULER_H);
-  g.fillStyle = '#15171b';
+  g.fillStyle = themeColor('--panel');
   g.fillRect(0, 0, GUTTER, RULER_H);
 
   const [step, sub] = RULER_STEPS.find(([s]) => s * state.pps >= 80) || RULER_STEPS[RULER_STEPS.length - 1];
@@ -286,13 +286,13 @@ function drawRuler() {
     if (x > w) break;
     if (x < GUTTER) continue;
     const major = i % sub === 0;
-    g.strokeStyle = major ? '#4a4f5b' : '#343842';
+    g.strokeStyle = major ? themeColor('--ruler-major') : themeColor('--ruler-minor');
     g.beginPath();
     g.moveTo(x, major ? 14 : RULER_H - 6);
     g.lineTo(x, RULER_H);
     g.stroke();
     if (major) {
-      g.fillStyle = '#8b919d';
+      g.fillStyle = themeColor('--text-dim');
       g.fillText(formatTime(t, step < 1 ? 1 : 0), x + 4, 4);
     }
   }
@@ -339,7 +339,7 @@ function drawRuler() {
     g.lineTo(mx + 5, RULER_H - 9);
     g.lineTo(mx, RULER_H - 2);
     g.closePath();
-    g.strokeStyle = '#ff7a45';
+    g.strokeStyle = themeColor('--accent');
     g.lineWidth = 1.2;
     g.stroke();
   }

@@ -201,7 +201,7 @@ function buildStemBlock(name) {
     for (const hd of handles) {
       g.beginPath();
       g.arc(hd.x, hd.y, 4.5, 0, Math.PI * 2);
-      g.fillStyle = '#14161a';
+      g.fillStyle = themeColor('--sunken');
       g.fill();
       g.strokeStyle = color;
       g.lineWidth = 2;

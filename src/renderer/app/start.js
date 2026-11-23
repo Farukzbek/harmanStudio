@@ -1,6 +1,9 @@
 'use strict';
 
 // -------------------------------------------------------------------- başlangıç
+let savedTheme = 'siyah';
+try { savedTheme = localStorage.getItem('harman.theme') || 'siyah'; } catch { /* özel pencere */ }
+setTheme(savedTheme, { save: false });
 buildTracks();
 offerRestore().then(() => {
   let seen = false;

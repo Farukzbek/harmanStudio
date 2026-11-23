@@ -298,3 +298,17 @@ function redo({ quiet = false } = {}) {
   restore(state.redo.pop());
   if (!quiet) toast('Yinelendi');
 }
+
+// ------------------------------------------------------------------- tema
+// Temalar CSS değişkenleriyle tanımlıdır (style.css); tuval çizimleri için değerler buradan okunur.
+const THEMES = { siyah: 'Siyah', komur: 'Kömür', gece: 'Gece mavisi', orman: 'Orman', acik: 'Açık' };
+let themeCache = {};
+const themeColor = (name) => (themeCache[name] ??= getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888');
+function setTheme(name, { save = true } = {}) {
+  const key = THEMES[name] ? name : 'siyah';
+  document.documentElement.dataset.theme = key;
+  themeCache = {};
+  if (save) { try { localStorage.setItem('harman.theme', key); } catch { /* özel pencere */ } }
+  window.harman.themeSet(key, getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()).catch(() => {});
+  if (typeof drawRuler === 'function' && el?.rulerCanvas) { drawRuler(); redrawVisible(); }
+}
